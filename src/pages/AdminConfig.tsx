@@ -9,65 +9,70 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Settings, Save, RefreshCw, Lock, Unlock } from "lucide-react";
 import { toast } from "sonner";
+import { 
+  getAdminConfig, 
+  getLocalAdminSettings, 
+  saveLocalAdminSettings,
+  updateGlobalAdminConfig,
+  type AdminConfig 
+} from "@/lib/adminConfig";
 
-interface AdminConfig {
-  imageSource: "stock" | "huggingface" | "pollinations";
-  debugMode: boolean;
-  maxDesignsPerGeneration: number;
-  enableMultiShirtSelection: boolean;
-  printifyApiToken: string;
-  customPromptSuggestions: string[];
-  maintenanceMode: boolean;
+interface LocalAdminSettings {
   adminPassword: string;
+  printifyApiToken: string;
 }
 
 const AdminConfigPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
-  const [config, setConfig] = useState<AdminConfig>({
+  const [globalConfig, setGlobalConfig] = useState<AdminConfig>({
     imageSource: "stock",
     debugMode: false,
     maxDesignsPerGeneration: 3,
     enableMultiShirtSelection: true,
-    printifyApiToken: "",
     customPromptSuggestions: [],
-    maintenanceMode: false,
-    adminPassword: "admin123" // Default password
+    maintenanceMode: false
+  });
+  const [localSettings, setLocalSettings] = useState<LocalAdminSettings>({
+    adminPassword: "admin123",
+    printifyApiToken: ""
   });
   const [newPromptSuggestion, setNewPromptSuggestion] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load config from localStorage on component mount
+  // Load config from backend and local settings on component mount
   useEffect(() => {
-    const savedConfig = localStorage.getItem('adminConfig');
-    if (savedConfig) {
+    const loadConfigs = async () => {
       try {
-        const parsedConfig = JSON.parse(savedConfig);
-        setConfig(prev => ({ ...prev, ...parsedConfig }));
+        // Load global config from backend
+        const globalConfigData = await getAdminConfig();
+        setGlobalConfig(globalConfigData);
+        
+        // Load local settings from localStorage
+        const localSettingsData = getLocalAdminSettings();
+        setLocalSettings(localSettingsData);
       } catch (error) {
-        console.error('Failed to load admin config:', error);
+        console.error('Failed to load admin configs:', error);
+        toast.error('Failed to load configuration');
       }
-    }
+    };
+    
+    loadConfigs();
   }, []);
 
-  // Save config to localStorage
+  // Save config to backend and local settings
   const saveConfig = async () => {
     setIsSaving(true);
     try {
-      localStorage.setItem('adminConfig', JSON.stringify(config));
-      // Also save to a global variable that the main app can access
-      (window as any).adminConfig = config;
+      // Save global config to backend
+      await updateGlobalAdminConfig(globalConfig, localSettings.adminPassword);
       
-      // Trigger a storage event for other tabs/windows
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'adminConfig',
-        newValue: JSON.stringify(config),
-        storageArea: localStorage
-      }));
+      // Save local settings to localStorage
+      saveLocalAdminSettings(localSettings);
       
       toast.success("Configuration saved successfully!");
     } catch (error) {
-      toast.error("Failed to save configuration");
+      toast.error("Failed to save configuration: " + (error as Error).message);
       console.error('Save error:', error);
     } finally {
       setIsSaving(false);
@@ -76,7 +81,7 @@ const AdminConfigPage = () => {
 
   // Authentication check
   const handleAuth = () => {
-    if (password === config.adminPassword) {
+    if (password === localSettings.adminPassword) {
       setIsAuthenticated(true);
       toast.success("Admin access granted");
     } else {
@@ -88,7 +93,7 @@ const AdminConfigPage = () => {
   // Add new prompt suggestion
   const addPromptSuggestion = () => {
     if (newPromptSuggestion.trim()) {
-      setConfig(prev => ({
+      setGlobalConfig(prev => ({
         ...prev,
         customPromptSuggestions: [...prev.customPromptSuggestions, newPromptSuggestion.trim()]
       }));
@@ -98,7 +103,7 @@ const AdminConfigPage = () => {
 
   // Remove prompt suggestion
   const removePromptSuggestion = (index: number) => {
-    setConfig(prev => ({
+    setGlobalConfig(prev => ({
       ...prev,
       customPromptSuggestions: prev.customPromptSuggestions.filter((_, i) => i !== index)
     }));
@@ -106,15 +111,17 @@ const AdminConfigPage = () => {
 
   // Reset to defaults
   const resetToDefaults = () => {
-    setConfig({
+    setGlobalConfig({
       imageSource: "stock",
       debugMode: false,
       maxDesignsPerGeneration: 3,
       enableMultiShirtSelection: true,
-      printifyApiToken: "",
       customPromptSuggestions: [],
-      maintenanceMode: false,
-      adminPassword: "admin123"
+      maintenanceMode: false
+    });
+    setLocalSettings({
+      adminPassword: "admin123",
+      printifyApiToken: ""
     });
     toast.success("Configuration reset to defaults");
   };
@@ -187,9 +194,9 @@ const AdminConfigPage = () => {
             <div>
               <Label htmlFor="imageSource">Default Image Source</Label>
               <Select
-                value={config.imageSource}
+                value={globalConfig.imageSource}
                 onValueChange={(value: "stock" | "huggingface" | "pollinations") => 
-                  setConfig(prev => ({ ...prev, imageSource: value }))
+                  setGlobalConfig(prev => ({ ...prev, imageSource: value }))
                 }
               >
                 <SelectTrigger>
@@ -213,8 +220,8 @@ const AdminConfigPage = () => {
                 type="number"
                 min="1"
                 max="10"
-                value={config.maxDesignsPerGeneration}
-                onChange={(e) => setConfig(prev => ({ 
+                value={globalConfig.maxDesignsPerGeneration}
+                onChange={(e) => setGlobalConfig(prev => ({ 
                   ...prev, 
                   maxDesignsPerGeneration: parseInt(e.target.value) || 3 
                 }))}
@@ -240,9 +247,9 @@ const AdminConfigPage = () => {
                 </p>
               </div>
               <Switch
-                checked={config.enableMultiShirtSelection}
+                checked={globalConfig.enableMultiShirtSelection}
                 onCheckedChange={(checked) => 
-                  setConfig(prev => ({ ...prev, enableMultiShirtSelection: checked }))
+                  setGlobalConfig(prev => ({ ...prev, enableMultiShirtSelection: checked }))
                 }
               />
             </div>
@@ -255,9 +262,9 @@ const AdminConfigPage = () => {
                 </p>
               </div>
               <Switch
-                checked={config.debugMode}
+                checked={globalConfig.debugMode}
                 onCheckedChange={(checked) => 
-                  setConfig(prev => ({ ...prev, debugMode: checked }))
+                  setGlobalConfig(prev => ({ ...prev, debugMode: checked }))
                 }
               />
             </div>
@@ -270,9 +277,9 @@ const AdminConfigPage = () => {
                 </p>
               </div>
               <Switch
-                checked={config.maintenanceMode}
+                checked={globalConfig.maintenanceMode}
                 onCheckedChange={(checked) => 
-                  setConfig(prev => ({ ...prev, maintenanceMode: checked }))
+                  setGlobalConfig(prev => ({ ...prev, maintenanceMode: checked }))
                 }
               />
             </div>
@@ -299,7 +306,7 @@ const AdminConfigPage = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {config.customPromptSuggestions.map((suggestion, index) => (
+              {globalConfig.customPromptSuggestions.map((suggestion, index) => (
                 <Badge
                   key={index}
                   variant="secondary"
@@ -327,8 +334,8 @@ const AdminConfigPage = () => {
               <Input
                 id="printifyToken"
                 type="password"
-                value={config.printifyApiToken}
-                onChange={(e) => setConfig(prev => ({ 
+                value={localSettings.printifyApiToken}
+                onChange={(e) => setLocalSettings(prev => ({ 
                   ...prev, 
                   printifyApiToken: e.target.value 
                 }))}
@@ -341,8 +348,8 @@ const AdminConfigPage = () => {
               <Input
                 id="adminPassword"
                 type="password"
-                value={config.adminPassword}
-                onChange={(e) => setConfig(prev => ({ 
+                value={localSettings.adminPassword}
+                onChange={(e) => setLocalSettings(prev => ({ 
                   ...prev, 
                   adminPassword: e.target.value 
                 }))}
