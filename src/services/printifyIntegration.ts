@@ -48,7 +48,7 @@ export interface OrderResponse {
 }
 
 class PrintifyIntegrationService {
-  private readonly baseUrl = '/v1';
+  private readonly baseUrl = '/api/printify';
 
   // Step 1: Get available variants for a blueprint
   async getBlueprint6Variants(): Promise<PrintifyVariant[]> {

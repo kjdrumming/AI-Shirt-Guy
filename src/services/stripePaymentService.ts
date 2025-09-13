@@ -21,7 +21,7 @@ export interface PaymentResult {
 }
 
 class StripePaymentService {
-  private baseUrl = 'http://localhost:3001/api/stripe'; // Point to backend server
+  private baseUrl = '/api/stripe'; // Point to backend server
   
   /**
    * Create a payment intent for the order
