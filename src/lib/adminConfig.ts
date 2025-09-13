@@ -4,10 +4,14 @@ export interface AdminConfig {
   debugMode: boolean;
   maxDesignsPerGeneration: number;
   enableMultiShirtSelection: boolean;
-  printifyApiToken: string;
   customPromptSuggestions: string[];
   maintenanceMode: boolean;
+}
+
+// Local admin settings (device-specific)
+interface LocalAdminSettings {
   adminPassword: string;
+  printifyApiToken: string;
 }
 
 // Default configuration
@@ -16,108 +20,191 @@ export const defaultAdminConfig: AdminConfig = {
   debugMode: false,
   maxDesignsPerGeneration: 3,
   enableMultiShirtSelection: true,
-  printifyApiToken: "",
   customPromptSuggestions: [],
-  maintenanceMode: false,
-  adminPassword: "admin123"
+  maintenanceMode: false
 };
 
-// Get current admin configuration
-export const getAdminConfig = (): AdminConfig => {
-  // First check if config is available in window object (set by admin page)
-  if ((window as any).adminConfig) {
-    return (window as any).adminConfig;
-  }
+// Default local settings
+const defaultLocalSettings: LocalAdminSettings = {
+  adminPassword: "admin123",
+  printifyApiToken: ""
+};
 
-  // Then check localStorage
+// Global config cache
+let globalConfigCache: AdminConfig | null = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 30000; // 30 seconds
+
+// Fetch global admin configuration from backend
+export const fetchGlobalAdminConfig = async (): Promise<AdminConfig> => {
   try {
-    const savedConfig = localStorage.getItem('adminConfig');
-    if (savedConfig) {
-      const parsedConfig = JSON.parse(savedConfig);
-      return { ...defaultAdminConfig, ...parsedConfig };
+    // Use cache if recent
+    const now = Date.now();
+    if (globalConfigCache && (now - lastFetchTime) < CACHE_DURATION) {
+      return globalConfigCache;
+    }
+
+    const response = await fetch('/api/admin/config');
+    if (!response.ok) {
+      throw new Error('Failed to fetch global config');
+    }
+    
+    const config = await response.json();
+    globalConfigCache = { ...defaultAdminConfig, ...config };
+    lastFetchTime = now;
+    
+    return globalConfigCache;
+  } catch (error) {
+    console.error('Failed to fetch global admin config:', error);
+    return globalConfigCache || defaultAdminConfig;
+  }
+};
+
+// Get current admin configuration (now fetches from backend)
+export const getAdminConfig = async (): Promise<AdminConfig> => {
+  return await fetchGlobalAdminConfig();
+};
+
+// Get local admin settings (still stored locally)
+export const getLocalAdminSettings = (): LocalAdminSettings => {
+  try {
+    const savedSettings = localStorage.getItem('localAdminSettings');
+    if (savedSettings) {
+      const parsedSettings = JSON.parse(savedSettings);
+      return { ...defaultLocalSettings, ...parsedSettings };
     }
   } catch (error) {
-    console.error('Failed to load admin config from localStorage:', error);
+    console.error('Failed to load local admin settings:', error);
   }
-
-  // Return default config
-  return defaultAdminConfig;
+  return defaultLocalSettings;
 };
 
-// Get current image source from admin config
+// Save local admin settings
+export const saveLocalAdminSettings = (settings: Partial<LocalAdminSettings>): void => {
+  try {
+    const currentSettings = getLocalAdminSettings();
+    const updatedSettings = { ...currentSettings, ...settings };
+    localStorage.setItem('localAdminSettings', JSON.stringify(updatedSettings));
+  } catch (error) {
+    console.error('Failed to save local admin settings:', error);
+  }
+};
+
+// Update global admin configuration (sends to backend)
+export const updateGlobalAdminConfig = async (config: Partial<AdminConfig>, password: string): Promise<boolean> => {
+  try {
+    const response = await fetch('/api/admin/config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        password,
+        config
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update config');
+    }
+
+    // Clear cache to force refresh
+    globalConfigCache = null;
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to update global admin config:', error);
+    throw error;
+  }
+};
+
+// Get current image source from cached global config (synchronous)
 export const getCurrentImageSource = (): "stock" | "huggingface" | "pollinations" => {
-  const config = getAdminConfig();
+  return globalConfigCache?.imageSource || defaultAdminConfig.imageSource;
+};
+
+// Get current image source from global admin config (async - use for guaranteed fresh data)
+export const getCurrentImageSourceAsync = async (): Promise<"stock" | "huggingface" | "pollinations"> => {
+  const config = await getAdminConfig();
   return config.imageSource;
 };
 
-// Check if maintenance mode is enabled
+// Check if maintenance mode is enabled (synchronous)
 export const isMaintenanceModeEnabled = (): boolean => {
-  const config = getAdminConfig();
+  return globalConfigCache?.maintenanceMode || defaultAdminConfig.maintenanceMode;
+};
+
+// Check if maintenance mode is enabled (async)
+export const isMaintenanceModeEnabledAsync = async (): Promise<boolean> => {
+  const config = await getAdminConfig();
   return config.maintenanceMode;
 };
 
-// Check if debug mode is enabled
+// Check if debug mode is enabled (synchronous)
 export const isDebugModeEnabled = (): boolean => {
-  const config = getAdminConfig();
+  return globalConfigCache?.debugMode || defaultAdminConfig.debugMode;
+};
+
+// Check if debug mode is enabled (async)
+export const isDebugModeEnabledAsync = async (): Promise<boolean> => {
+  const config = await getAdminConfig();
   return config.debugMode;
 };
 
-// Get max designs per generation
+// Get max designs per generation (synchronous)
 export const getMaxDesignsPerGeneration = (): number => {
-  const config = getAdminConfig();
+  return globalConfigCache?.maxDesignsPerGeneration || defaultAdminConfig.maxDesignsPerGeneration;
+};
+
+// Get max designs per generation (async)
+export const getMaxDesignsPerGenerationAsync = async (): Promise<number> => {
+  const config = await getAdminConfig();
   return config.maxDesignsPerGeneration;
 };
 
-// Check if multi-shirt selection is enabled
+// Check if multi-shirt selection is enabled (synchronous)
 export const isMultiShirtSelectionEnabled = (): boolean => {
-  const config = getAdminConfig();
+  return globalConfigCache?.enableMultiShirtSelection || defaultAdminConfig.enableMultiShirtSelection;
+};
+
+// Check if multi-shirt selection is enabled (async)
+export const isMultiShirtSelectionEnabledAsync = async (): Promise<boolean> => {
+  const config = await getAdminConfig();
   return config.enableMultiShirtSelection;
 };
 
-// Get custom prompt suggestions
+// Get custom prompt suggestions (synchronous)
 export const getCustomPromptSuggestions = (): string[] => {
-  const config = getAdminConfig();
+  return globalConfigCache?.customPromptSuggestions || defaultAdminConfig.customPromptSuggestions;
+};
+
+// Get custom prompt suggestions (async)
+export const getCustomPromptSuggestionsAsync = async (): Promise<string[]> => {
+  const config = await getAdminConfig();
   return config.customPromptSuggestions;
 };
 
-// Get Printify API token
+// Get Printify API token from local settings
 export const getPrintifyApiToken = (): string => {
-  const config = getAdminConfig();
-  return config.printifyApiToken;
-};
-
-// Save admin configuration
-export const saveAdminConfig = (config: AdminConfig): void => {
-  try {
-    localStorage.setItem('adminConfig', JSON.stringify(config));
-    (window as any).adminConfig = config;
-  } catch (error) {
-    console.error('Failed to save admin config:', error);
-  }
+  const settings = getLocalAdminSettings();
+  return settings.printifyApiToken;
 };
 
 // Initialize admin config on app startup
-export const initializeAdminConfig = (): void => {
-  const config = getAdminConfig();
-  (window as any).adminConfig = config;
+export const initializeAdminConfig = async (): Promise<void> => {
+  // Fetch initial global config
+  await fetchGlobalAdminConfig();
   
-  // Listen for storage changes to update config when admin page makes changes
+  // Set up periodic refresh of global config
   if (typeof window !== 'undefined') {
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'adminConfig' && e.newValue) {
-        try {
-          const updatedConfig = JSON.parse(e.newValue);
-          (window as any).adminConfig = { ...defaultAdminConfig, ...updatedConfig };
-        } catch (error) {
-          console.error('Failed to parse updated admin config:', error);
-        }
+    // Refresh global config every 30 seconds
+    setInterval(async () => {
+      try {
+        await fetchGlobalAdminConfig();
+      } catch (error) {
+        console.error('Failed to refresh global admin config:', error);
       }
-    });
-    
-    // Also listen for focus events (when user switches back from admin tab)
-    window.addEventListener('focus', () => {
-      const config = getAdminConfig();
-      (window as any).adminConfig = config;
-    });
+    }, 30000);
   }
 };

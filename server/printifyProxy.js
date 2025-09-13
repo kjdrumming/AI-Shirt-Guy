@@ -26,6 +26,7 @@ const { generalLimiter, stripePaymentLimiter, printifyLimiter, securityHeaders }
 // Import Stripe and Printify multi-order routes
 const stripeRoutes = require('./routes/stripe');
 const printifyMultiOrderRoutes = require('./routes/printifyMultiOrder');
+const adminConfigRoutes = require('./routes/adminConfig');
 
 // Apply security middleware
 app.use(securityHeaders);
@@ -46,6 +47,9 @@ app.use(express.json({ limit: '10mb' })); // Limit request body size
 
 // Stripe API routes with rate limiting
 app.use('/api/stripe', stripePaymentLimiter, stripeRoutes);
+
+// Admin configuration routes
+app.use('/api/admin', generalLimiter, adminConfigRoutes);
 
 // Printify multi-order endpoint
 app.use('/api/printify/multi-order', printifyLimiter, printifyMultiOrderRoutes);
