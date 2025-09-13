@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Upload</title>
+</head>
+<body>
+    <h1>Test Printify Image Upload</h1>
+    <button onclick="testImageUpload()">Test Upload</button>
+    <div id="results"></div>
+
+    <script>
+        // Test image upload to Printify
+        async function testImageUpload() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing image upload...</p>';
+            
+            console.log('🔍 Testing image upload to Printify...\n');
+
+            try {
+                // Create a simple test image blob
+                const canvas = document.createElement('canvas');
+                canvas.width = 300;
+                canvas.height = 300;
+                const ctx = canvas.getContext('2d');
+                
+                // Draw a simple design
+                ctx.fillStyle = '#FF6B6B';
+                ctx.fillRect(0, 0, 300, 300);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '32px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('TEST', 150, 150);
+
+                // Convert to blob
+                const imageBlob = await new Promise(resolve => {
+                    canvas.toBlob(resolve, 'image/png');
+                });
+
+                console.log('📷 Created test image blob:', imageBlob.size, 'bytes');
+
+                // Test upload via proxy
+                const formData = new FormData();
+                formData.append('file', imageBlob, 'test-design.png');
+
+                console.log('📤 Uploading via proxy...');
+                const response = await fetch('/api/printify/v1/uploads/images.json', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('📡 Response status:', response.status);
+                console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('✅ Upload successful:', data);
+                    resultsDiv.innerHTML = `
+                        <h3>✅ Upload Successful!</h3>
+                        <p>Image ID: ${data.id}</p>
+                        <p>Preview: <img src="${data.preview_url}" style="max-width: 200px;"></p>
+                    `;
+                    return data.id;
+                } else {
+                    const errorText = await response.text();
+                    console.log('❌ Upload failed:', errorText);
+                    
+                    // Try to parse as JSON if possible
+                    let errorDetails = errorText;
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        console.log('📋 Error details:', errorJson);
+                        errorDetails = JSON.stringify(errorJson, null, 2);
+                    } catch (e) {
+                        console.log('📋 Raw error:', errorText);
+                    }
+                    
+                    resultsDiv.innerHTML = `
+                        <h3>❌ Upload Failed</h3>
+                        <p>Status: ${response.status}</p>
+                        <pre>${errorDetails}</pre>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('❌ Network error:', error);
+                resultsDiv.innerHTML = `
+                    <h3>❌ Network Error</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "printify-proxy-server",
+  "version": "1.0.0",
+  "description": "Production proxy server for Printify API",
+  "main": "printifyProxy.js",
+  "scripts": {
+    "start": "node printifyProxy.js",
+    "dev": "nodemon printifyProxy.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.1.0",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "node-fetch": "^2.7.0",
+    "stripe": "^18.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

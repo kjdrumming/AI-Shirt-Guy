@@ -1,0 +1,511 @@
+// Simplified Printify integration for the core flow
+export interface Pri  }
+
+  // Helper method to process images for Printify compatibility
+  private async processImageForPrintify(imageBlob: Blob): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        try {
+          // Set reasonable dimensions for t-shirt printing (Printify recommends 300 DPI)
+          const maxWidth = 3000;
+          const maxHeight = 3000;
+          
+          let { width, height } = img;
+          
+          // Scale down if too large
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.floor(width * ratio);
+            height = Math.floor(height * ratio);
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw image with white background (in case of transparency)
+          if (ctx) {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+          }
+          
+          // Convert to high-quality JPEG (Printify prefers JPEG over PNG)
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Failed to convert image to blob'));
+              }
+            },
+            'image/jpeg',
+            0.95 // High quality
+          );
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Failed to load image for processing'));
+      };
+      
+      // Create object URL from blob to load into image
+      const objectUrl = URL.createObjectURL(imageBlob);
+      img.src = objectUrl;
+      
+      // Clean up object URL after loading
+      img.onload = (originalOnload => function(this: any, ...args: any[]) {
+        URL.revokeObjectURL(objectUrl);
+        return originalOnload.apply(this, args);
+      })(img.onload as any);
+    });
+  }
+
+  // Step 2: Upload image to Printify
+  async uploadImage(imageUrl: string, fileName: string = 'design.png'): Promise<string> {yVariant {
+  id: number;
+  title: string;
+  options: {
+    color: string;
+    size: string;
+  };
+  price: number;
+  is_enabled: boolean;
+}
+
+export interface PrintifyProduct {
+  id: string;
+  title: string;
+  description: string;
+  images: Array<{
+    src: string;
+    alt: string;
+    position: string;
+    is_default: boolean;
+  }>;
+  variants: PrintifyVariant[];
+  blueprint_id: number;
+  print_provider_id: number;
+}
+
+export interface CreateProductRequest {
+  title: string;
+  description: string;
+  blueprint_id: number;
+  print_provider_id: number;
+  variants: Array<{
+    id: number;
+    price: number;
+    is_enabled: boolean;
+  }>;
+  print_areas: Array<{
+    variant_ids: number[];
+    placeholders: Array<{
+      position: string;
+      images: Array<{
+        id: string;
+        x: number;
+        y: number;
+        scale: number;
+        angle: number;
+      }>;
+    }>;
+  }>;
+}
+
+class PrintifyIntegrationService {
+  private baseUrl = '/api/printify/v1';
+  private shopId = '24294177'; // AI-Shirt-Guy shop ID from the environment
+
+  // Step 1: Get variants for the Unisex Heavy Cotton Tee from Stacked Commerce
+  async getProductVariants(blueprintId: number = 6, printProviderId: number = 103): Promise<PrintifyVariant[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/catalog/blueprints/${blueprintId}/print_providers/${printProviderId}/variants.json`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to get variants: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('🔵 Available variants:', data);
+      
+      return data.variants || [];
+    } catch (error) {
+      console.error('❌ Error getting variants:', error);
+      throw error;
+    }
+  }
+
+  // Step 2: Upload design image to Printify
+  async uploadImage(imageUrl: string, fileName: string = 'design.png'): Promise<string> {
+    try {
+      console.log('🔵 Starting image upload for:', imageUrl);
+      
+      // Try URL-based upload first (simpler approach)
+      if (!imageUrl.startsWith('blob:')) {
+        console.log('🔵 Attempting URL-based upload...');
+        
+        const urlUploadData = {
+          file_name: fileName,
+          url: imageUrl
+        };
+
+        const urlResponse = await fetch(`${this.baseUrl}/uploads/images.json`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(urlUploadData)
+        });
+
+        console.log('🔵 URL upload response status:', urlResponse.status);
+
+        if (urlResponse.ok) {
+          const data = await urlResponse.json();
+          console.log('✅ URL-based image upload successful:', data);
+          return data.id;
+        } else {
+          const errorText = await urlResponse.text();
+          console.log('❌ URL upload failed, trying contents upload...', errorText);
+        }
+      }
+
+      // Fallback to contents-based upload for blob URLs or if URL upload failed
+      console.log('🔵 Attempting contents-based upload...');
+      
+      // For AI-generated images, we need to convert blob URL to actual file
+      let imageBlob;
+      
+      if (imageUrl.startsWith('blob:')) {
+        // Fetch the blob URL to get the actual image data
+        const blobResponse = await fetch(imageUrl);
+        if (!blobResponse.ok) {
+          throw new Error(`Failed to fetch blob: ${blobResponse.status}`);
+        }
+        imageBlob = await blobResponse.blob();
+      } else {
+        // For regular URLs, fetch the image
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+        }
+        imageBlob = await imageResponse.blob();
+      }
+
+      console.log('🔵 Image blob details:', {
+        size: imageBlob.size,
+        type: imageBlob.type
+      });
+
+      // Validate image
+      if (imageBlob.size === 0) {
+        throw new Error('Image blob is empty');
+      }
+
+      if (!imageBlob.type.startsWith('image/')) {
+        throw new Error(`Invalid image type: ${imageBlob.type}`);
+      }
+
+      // Check if image is too large (Printify has size limits)
+      const maxSize = 10 * 1024 * 1024; // 10MB limit
+      if (imageBlob.size > maxSize) {
+        throw new Error(`Image too large: ${imageBlob.size} bytes (max: ${maxSize})`);
+      }
+
+      // Process image to ensure it's in a compatible format
+      const processedImageBlob = await this.processImageForPrintify(imageBlob);
+      
+      console.log('🔵 Processed image details:', {
+        size: processedImageBlob.size,
+        type: processedImageBlob.type
+      });
+
+      // Convert to base64 for contents field
+      const arrayBuffer = await processedImageBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Convert to base64 in chunks to avoid stack overflow
+      let binaryString = '';
+      const chunkSize = 8192; // Process in chunks of 8KB
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const base64String = btoa(binaryString);
+      
+      const contentsUploadData = {
+        file_name: fileName,
+        contents: `data:${processedImageBlob.type};base64,${base64String}`
+      };
+
+      console.log('🔵 Uploading image with base64 contents...');
+
+      const contentsResponse = await fetch(`${this.baseUrl}/uploads/images.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(contentsUploadData)
+      });
+
+      console.log('🔵 Contents upload response status:', contentsResponse.status);
+
+      if (!contentsResponse.ok) {
+        const errorText = await contentsResponse.text();
+        console.error('❌ Contents upload error details:', errorText);
+        
+        // Try to parse error response
+        let errorDetails = errorText;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorDetails = JSON.stringify(errorData, null, 2);
+          console.error('❌ Parsed error data:', errorData);
+        } catch (e) {
+          // Keep original text if not JSON
+        }
+        
+        throw new Error(`Failed to upload image: ${contentsResponse.status} ${contentsResponse.statusText}\nDetails: ${errorDetails}`);
+      }
+
+      const data = await contentsResponse.json();
+      console.log('✅ Contents-based image upload successful:', data);
+      
+      if (!data.id) {
+        throw new Error('Upload response missing image ID');
+      }
+      
+      return data.id; // Return the uploaded image ID
+    } catch (error) {
+      console.error('❌ Error uploading image:', error);
+      throw error;
+    }
+  }
+
+  // Step 3: Create product with the uploaded design
+  async createProduct(
+    title: string,
+    description: string,
+    imageId: string,
+    selectedColor: string,
+    selectedSize: string,
+    price: number = 2499 // Price in cents
+  ): Promise<PrintifyProduct> {
+    try {
+      // First get available variants to find the right one
+      const variants = await this.getProductVariants();
+      
+      console.log('🔍 Looking for variant:', { selectedColor, selectedSize });
+      console.log('🔍 Available variants sample:', variants.slice(0, 5).map(v => ({
+        id: v.id,
+        title: v.title,
+        color: v.options?.color,
+        size: v.options?.size
+      })));
+      
+      // Find the variant that matches the selected color and size with flexible matching
+      const matchingVariant = variants.find(variant => {
+        const variantColor = variant.options?.color || '';
+        const variantSize = variant.options?.size || '';
+        
+        const colorMatch = variantColor.toLowerCase().includes(selectedColor.toLowerCase()) ||
+                          selectedColor.toLowerCase().includes(variantColor.toLowerCase());
+        const sizeMatch = variantSize === selectedSize;
+        
+        console.log('🔍 Checking variant:', {
+          variantColor,
+          variantSize,
+          colorMatch,
+          sizeMatch,
+          title: variant.title
+        });
+        
+        return colorMatch && sizeMatch;
+      });
+
+      if (!matchingVariant) {
+        // Show available options for debugging
+        const availableOptions = variants.reduce((acc, variant) => {
+          const color = variant.options?.color || 'Unknown';
+          const size = variant.options?.size || 'Unknown';
+          const key = `${color} ${size}`;
+          if (!acc.includes(key)) acc.push(key);
+          return acc;
+        }, [] as string[]);
+        
+        console.error('❌ Available color/size combinations:', availableOptions.slice(0, 10));
+        throw new Error(`No variant found for ${selectedColor} ${selectedSize}. Available options: ${availableOptions.slice(0, 5).join(', ')}`);
+      }
+
+      console.log('🔵 Using variant:', matchingVariant);
+
+      // Create the product request
+      const productRequest: CreateProductRequest = {
+        title,
+        description,
+        blueprint_id: 6, // Unisex Heavy Cotton Tee
+        print_provider_id: 103, // Stacked Commerce
+        variants: [{
+          id: matchingVariant.id,
+          price,
+          is_enabled: true
+        }],
+        print_areas: [{
+          variant_ids: [matchingVariant.id],
+          placeholders: [{
+            position: "front",
+            images: [{
+              id: imageId,
+              x: 0.5, // Center horizontally
+              y: 0.35, // Position slightly higher on chest
+              scale: 0.85, // 85% of print area (much larger)
+              angle: 0
+            }]
+          }]
+        }]
+      };
+
+      console.log('🔵 Creating product with request:', productRequest);
+
+      const response = await fetch(`${this.baseUrl}/shops/${this.shopId}/products.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(productRequest)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create product: ${response.status} ${response.statusText}\n${errorText}`);
+      }
+
+      const product = await response.json();
+      console.log('🔵 Product created:', product);
+      
+      return product;
+    } catch (error) {
+      console.error('❌ Error creating product:', error);
+      throw error;
+    }
+  }
+
+  // Step 4: Create order for the product
+  async createOrder(
+    productId: string,
+    variantId: number,
+    quantity: number = 1,
+    shippingAddress: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone: string;
+      country: string;
+      region: string;
+      address1: string;
+      city: string;
+      zip: string;
+    }
+  ) {
+    try {
+      const orderRequest = {
+        external_id: `order-${Date.now()}`,
+        shipping_method: 1, // Standard shipping
+        is_printify_express: false,
+        is_economy_shipping: false,
+        line_items: [{
+          product_id: productId,
+          variant_id: variantId,
+          quantity
+        }],
+        address_to: shippingAddress
+      };
+
+      console.log('🔵 Creating order with request:', orderRequest);
+
+      const response = await fetch(`${this.baseUrl}/shops/${this.shopId}/orders.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderRequest)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create order: ${response.status} ${response.statusText}\n${errorText}`);
+      }
+
+      const order = await response.json();
+      console.log('🔵 Order created:', order);
+      
+      return order;
+    } catch (error) {
+      console.error('❌ Error creating order:', error);
+      throw error;
+    }
+  }
+
+  // Delete a product from the shop
+  async deleteProduct(productId: string) {
+    try {
+      console.log('🗑️ Deleting product:', productId);
+
+      const response = await fetch(`${this.baseUrl}/shops/${this.shopId}/products/${productId}.json`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete product: ${response.status} ${response.statusText}\n${errorText}`);
+      }
+
+      console.log('🔵 Product deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Error deleting product:', error);
+      throw error;
+    }
+  }
+
+  // Complete flow: Create product from design
+  async createProductFromDesign(
+    designUrl: string,
+    designTitle: string,
+    selectedColor: string,
+    selectedSize: string,
+    price: number = 2499
+  ): Promise<PrintifyProduct> {
+    try {
+      console.log('🚀 Starting product creation flow...');
+      
+      // Step 1: Upload the design image
+      console.log('📤 Uploading design image...');
+      const imageId = await this.uploadImage(designUrl, `${designTitle}.png`);
+      
+      // Step 2: Create the product
+      console.log('🛍️ Creating product...');
+      const product = await this.createProduct(
+        `Custom Design: ${designTitle}`,
+        `AI-generated design on ${selectedColor} ${selectedSize} Gildan Heavy Cotton Tee`,
+        imageId,
+        selectedColor,
+        selectedSize,
+        price
+      );
+      
+      console.log('✅ Product creation complete!', product);
+      return product;
+      
+    } catch (error) {
+      console.error('❌ Product creation flow failed:', error);
+      throw error;
+    }
+  }
+}
+
+export const printifyIntegration = new PrintifyIntegrationService();

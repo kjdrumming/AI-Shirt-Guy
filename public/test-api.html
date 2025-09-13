@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Printify API Test</title>
+</head>
+<body>
+    <h1>Printify API Test</h1>
+    <button onclick="testAPI()">Test API Access</button>
+    <div id="results"></div>
+
+    <script>
+        async function testAPI() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                console.log('🔍 Testing Printify API access...');
+                
+                // Test 1: Try to get blueprint info
+                console.log('📋 Testing blueprint access...');
+                const blueprintResponse = await fetch('/api/printify/v1/catalog/blueprints/6.json');
+                console.log('Blueprint response:', blueprintResponse.status, blueprintResponse.statusText);
+                
+                if (blueprintResponse.ok) {
+                    const blueprint = await blueprintResponse.json();
+                    console.log('✅ Blueprint loaded:', blueprint.title);
+                } else {
+                    const errorText = await blueprintResponse.text();
+                    console.log('❌ Blueprint error:', errorText);
+                }
+                
+                // Test 2: Try to get print providers
+                console.log('🏭 Testing print providers access...');
+                const providersResponse = await fetch('/api/printify/v1/catalog/blueprints/6/print_providers.json');
+                console.log('Providers response:', providersResponse.status, providersResponse.statusText);
+                
+                if (providersResponse.ok) {
+                    const providers = await providersResponse.json();
+                    console.log('✅ Providers loaded:', providers.length);
+                    
+                    // Find Monster Digital
+                    const monsterDigital = providers.find(p => p.id === 29);
+                    if (monsterDigital) {
+                        console.log('🎯 Found Monster Digital:', monsterDigital.title);
+                        
+                        // Test 3: Try to get variants for Monster Digital
+                        console.log('📦 Testing variants access...');
+                        const variantsResponse = await fetch('/api/printify/v1/catalog/blueprints/6/print_providers/29/variants.json');
+                        console.log('Variants response:', variantsResponse.status, variantsResponse.statusText);
+                        
+                        if (variantsResponse.ok) {
+                            const variants = await variantsResponse.json();
+                            console.log('✅ Variants loaded:', variants.variants?.length || 0);
+                            resultsDiv.innerHTML = `
+                                <h3>✅ Success!</h3>
+                                <p>Blueprint: ${blueprint.title}</p>
+                                <p>Providers: ${providers.length}</p>
+                                <p>Variants: ${variants.variants?.length || 0}</p>
+                            `;
+                        } else {
+                            const errorText = await variantsResponse.text();
+                            console.log('❌ Variants error:', errorText);
+                            resultsDiv.innerHTML = `
+                                <h3>❌ Variants Failed</h3>
+                                <p>Status: ${variantsResponse.status}</p>
+                                <p>Error: ${errorText}</p>
+                            `;
+                        }
+                    } else {
+                        console.log('❌ Monster Digital not found');
+                        resultsDiv.innerHTML = '<h3>❌ Monster Digital not found</h3>';
+                    }
+                } else {
+                    const errorText = await providersResponse.text();
+                    console.log('❌ Providers error:', errorText);
+                    resultsDiv.innerHTML = `
+                        <h3>❌ Providers Failed</h3>
+                        <p>Status: ${providersResponse.status}</p>
+                        <p>Error: ${errorText}</p>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('❌ Network error:', error);
+                resultsDiv.innerHTML = `<h3>❌ Network Error</h3><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
