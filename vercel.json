@@ -20,10 +20,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "VITE_STRIPE_PUBLISHABLE_KEY": "@vite_stripe_publishable_key",
-    "VITE_HUGGINGFACE_API_TOKEN": "@vite_huggingface_api_token",
-    "VITE_PRINTIFY_API_TOKEN": "@vite_printify_api_token"
-  }
+  ]
 }
