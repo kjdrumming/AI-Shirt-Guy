@@ -337,9 +337,7 @@ class PrintifyIntegrationService {
       // Step 2: Create the product
       const productId = await this.createProduct(title, description, imageId, variantId);
       console.log('✅ Product created with ID:', productId);
-      
-      // Step 3: Publish the product (optional)
-      await this.publishProduct(productId);
+      // Product is created but NOT published
       
       // Step 4: Get product details to return
       const productDetails = await this.getProductDetails(productId);

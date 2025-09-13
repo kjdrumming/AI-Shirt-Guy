@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Heart, ShoppingCart, AlertCircle, Download } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Heart, ShoppingCart, AlertCircle, Download, X } from "lucide-react";
 import { ShirtMockup } from "@/components/ShirtMockup";
 
 interface Design {
@@ -15,13 +16,16 @@ interface Design {
 interface DesignDisplayProps {
   designs: Design[];
   onSelectDesign: (design: Design) => void;
-  selectedDesign: Design | null;
+  selectedDesign: Design | null; // Keep for compatibility but will use selectedDesigns prop when available
+  selectedDesigns?: Design[]; // New prop for multiple selections
+  designConfigs?: {[designId: string]: {color: string, size: string, variant: any}}; // Configuration for each design
   onDownloadImage?: (imageUrl: string, title: string) => void;
 }
 
-export function DesignDisplay({ designs, onSelectDesign, selectedDesign, onDownloadImage }: DesignDisplayProps) {
+export function DesignDisplay({ designs, onSelectDesign, selectedDesign, selectedDesigns = [], designConfigs = {}, onDownloadImage }: DesignDisplayProps) {
   const [likedDesigns, setLikedDesigns] = useState<Set<string>>(new Set());
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [previewImage, setPreviewImage] = useState<Design | null>(null);
 
   const toggleLike = (designId: string) => {
     setLikedDesigns(prev => {
@@ -54,30 +58,49 @@ export function DesignDisplay({ designs, onSelectDesign, selectedDesign, onDownl
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {designs.map((design, index) => {
+          const isSelected = selectedDesigns.some(d => d.id === design.id) || selectedDesign?.id === design.id;
+          const canSelect = selectedDesigns.length < 3 || isSelected;
+          const config = designConfigs[design.id];
+          
           return (
             <Card 
               key={design.id}
               className={`group cursor-pointer transition-all duration-300 hover:shadow-creative ${
-                selectedDesign?.id === design.id 
+                isSelected 
                   ? 'ring-2 ring-primary shadow-creative' 
-                  : 'hover:scale-105'
+                  : canSelect ? 'hover:scale-105' : 'opacity-50 cursor-not-allowed'
               }`}
-              onClick={() => onSelectDesign(design)}
+              onClick={() => canSelect && onSelectDesign(design)}
             >
               <CardContent className="p-4 space-y-4">
                 <div className="relative">
-                  <div className="aspect-square rounded-lg overflow-hidden bg-gradient-subtle">
+                  <div 
+                    className="aspect-square rounded-lg overflow-hidden bg-gradient-subtle cursor-pointer group-hover:shadow-lg transition-shadow"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!imageErrors.has(design.id)) {
+                        setPreviewImage(design);
+                      }
+                    }}
+                  >
                     {imageErrors.has(design.id) ? (
                       <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
                         <AlertCircle className="h-12 w-12 mb-2" />
                         <p className="text-sm">Failed to load image</p>
                       </div>
                     ) : (
-                      <ShirtMockup
-                        designUrl={design.imageUrl}
-                        className="w-full h-full"
-                        onImageError={() => handleImageError(design.id)}
-                      />
+                      <>
+                        <ShirtMockup
+                          designUrl={design.imageUrl}
+                          className="w-full h-full transition-transform group-hover:scale-105"
+                          onImageError={() => handleImageError(design.id)}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <div className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 px-2 py-1 rounded">
+                            Click to preview
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
                   
@@ -132,16 +155,22 @@ export function DesignDisplay({ designs, onSelectDesign, selectedDesign, onDownl
                   </div>
 
                   <Button
-                    variant={selectedDesign?.id === design.id ? "creative" : "outline"}
+                    variant={isSelected ? "creative" : canSelect ? "outline" : "secondary"}
                     size="sm"
                     className="w-full"
+                    disabled={!canSelect}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onSelectDesign(design);
+                      if (canSelect) onSelectDesign(design);
                     }}
                   >
                     <ShoppingCart className="mr-2 h-4 w-4" />
-                    {selectedDesign?.id === design.id ? 'Selected' : 'Select This Design'}
+                    {isSelected && config ? 
+                      `${config.color} • ${config.size}` : 
+                      isSelected ? 'Selected' : 
+                      selectedDesigns.length >= 3 ? 'Limit Reached' : 
+                      'Select This Design'
+                    }
                   </Button>
                 </div>
               </CardContent>
@@ -150,14 +179,74 @@ export function DesignDisplay({ designs, onSelectDesign, selectedDesign, onDownl
         })}
       </div>
 
-      {selectedDesign && (
-        <div className="text-center">
+      {(selectedDesigns.length > 0 || selectedDesign) && (
+        <div className="text-center space-y-2">
+          {selectedDesigns.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {selectedDesigns.length} of 3 designs selected
+            </p>
+          )}
           <Button variant="creative" size="lg" className="animate-pulse-glow">
             <ShoppingCart className="mr-2 h-4 w-4" />
-            Continue to Shirt Selection
+            Continue to Shirt Configuration
           </Button>
         </div>
       )}
+
+      {/* AI Image Preview Dialog */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-4xl w-full p-0">
+          {previewImage && (
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 z-10 h-8 w-8 p-0 bg-black/50 hover:bg-black/70 text-white"
+                onClick={() => setPreviewImage(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <div className="p-6">
+                <div className="text-center mb-4">
+                  <h3 className="text-xl font-semibold mb-2">{previewImage.title}</h3>
+                  <p className="text-sm text-muted-foreground">{previewImage.prompt}</p>
+                </div>
+                <div className="flex justify-center">
+                  <img
+                    src={previewImage.imageUrl}
+                    alt={previewImage.title}
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                  />
+                </div>
+                <div className="flex gap-3 justify-center mt-6">
+                  {onDownloadImage && (
+                    <Button
+                      variant="outline"
+                      onClick={() => onDownloadImage(previewImage.imageUrl, previewImage.title)}
+                      className="gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </Button>
+                  )}
+                  <Button
+                    variant="creative"
+                    onClick={() => {
+                      onSelectDesign(previewImage);
+                      setPreviewImage(null);
+                    }}
+                    className="gap-2"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    Select This Design
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

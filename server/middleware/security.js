@@ -32,6 +32,13 @@ const imageLimiter = createRateLimit(
   'Too many image generation requests, please try again later.'
 );
 
+// Printify API rate limit (conservative but functional)
+const printifyLimiter = createRateLimit(
+  60 * 1000, // 1 minute
+  15, // limit each IP to 15 Printify API calls per minute (allows product creation flow while staying well below 100/min limit)
+  'Printify API rate limit exceeded. Please wait before making more requests.'
+);
+
 module.exports = {
   generalLimiter,
   stripePaymentLimiter,
@@ -55,6 +62,7 @@ module.exports = {
   generalLimiter,
   stripePaymentLimiter,
   imageLimiter,
+  printifyLimiter,
   
   // Input validation middleware
   validateInput: (req, res, next) => {
