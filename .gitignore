@@ -18,6 +18,9 @@ dist-ssr
 !.env.example
 server/.env
 server/.env.*
+
+# Admin configuration data (user-specific, don't commit)
+server/data/adminConfig.json
 !server/.env.example
 
 # Editor directories and files
