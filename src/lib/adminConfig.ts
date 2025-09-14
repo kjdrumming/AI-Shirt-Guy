@@ -41,7 +41,7 @@ const defaultLocalSettings: LocalAdminSettings = {
 // Global config cache
 let globalConfigCache: AdminConfig | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 30000; // 30 seconds
+const CACHE_DURATION = 300000; // 5 minutes (reduced frequency to avoid rate limits)
 
 // Fetch global admin configuration from backend
 export const fetchGlobalAdminConfig = async (): Promise<AdminConfig> => {
@@ -55,6 +55,12 @@ export const fetchGlobalAdminConfig = async (): Promise<AdminConfig> => {
 
     console.log('🌐 Fetching global admin config from backend...');
     const response = await fetch('/api/admin/config');
+    
+    if (response.status === 429) {
+      console.warn('⚠️ Rate limited - using cached or default config');
+      return globalConfigCache || defaultAdminConfig;
+    }
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch global config: ${response.status}`);
     }
@@ -244,13 +250,13 @@ export const initializeAdminConfig = async (): Promise<void> => {
   
   // Set up periodic refresh of global config
   if (typeof window !== 'undefined') {
-    // Refresh global config every 30 seconds
+    // Refresh global config every 5 minutes (reduced frequency)
     setInterval(async () => {
       try {
         await fetchGlobalAdminConfig();
       } catch (error) {
         console.error('Failed to refresh global admin config:', error);
       }
-    }, 30000);
+    }, 300000); // 5 minutes
   }
 };

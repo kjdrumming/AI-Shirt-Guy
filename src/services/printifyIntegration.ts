@@ -51,24 +51,47 @@ export interface OrderResponse {
 
 class PrintifyIntegrationService {
   private readonly baseUrl = '/api/printify';
+  private variantsCache: PrintifyVariant[] | null = null;
+  private variantsCacheTime = 0;
+  private readonly VARIANTS_CACHE_DURATION = 600000; // 10 minutes
 
   // Step 1: Get available variants for a blueprint
   async getBlueprint6Variants(): Promise<PrintifyVariant[]> {
     try {
+      // Use cache if recent
+      const now = Date.now();
+      if (this.variantsCache && (now - this.variantsCacheTime) < this.VARIANTS_CACHE_DURATION) {
+        console.log('📋 Using cached variants:', this.variantsCache.length);
+        return this.variantsCache;
+      }
+
       const blueprintId = getBlueprintId();
       const printProviderId = getPrintProviderId();
       const response = await fetch(`${this.baseUrl}/catalog/blueprints/${blueprintId}/print_providers/${printProviderId}/variants.json`);
+      
+      if (response.status === 429) {
+        console.warn('⚠️ Variants API rate limited - using cached or empty array');
+        return this.variantsCache || [];
+      }
       
       if (!response.ok) {
         throw new Error(`Failed to fetch variants: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('📋 Available variants:', data.variants?.length || 0);
+      this.variantsCache = data.variants || [];
+      this.variantsCacheTime = now;
       
-      return data.variants || [];
+      console.log('📋 Available variants:', this.variantsCache.length);
+      
+      return this.variantsCache;
     } catch (error) {
       console.error('❌ Error fetching variants:', error);
+      // Return cached variants if available, otherwise throw
+      if (this.variantsCache) {
+        console.log('📋 Returning cached variants due to error');
+        return this.variantsCache;
+      }
       throw error;
     }
   }
