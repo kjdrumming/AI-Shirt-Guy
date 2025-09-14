@@ -374,13 +374,13 @@ export function PromptInput({ onGenerate, isGenerating }: PromptInputProps) {
                 <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {quickPrompts.map((quickPrompt, index) => (
                 <Button
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="text-xs h-auto py-2 px-3"
+                  className="text-xs h-auto py-2 px-3 text-left whitespace-normal leading-tight"
                   onClick={() => setPrompt(quickPrompt)}
                   disabled={isGenerating}
                 >
