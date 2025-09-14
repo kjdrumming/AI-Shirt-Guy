@@ -16,7 +16,7 @@ interface LocalAdminSettings {
 
 // Default configuration
 export const defaultAdminConfig: AdminConfig = {
-  imageSource: "stock",
+  imageSource: "pollinations",
   debugMode: false,
   maxDesignsPerGeneration: 3,
   enableMultiShirtSelection: true,

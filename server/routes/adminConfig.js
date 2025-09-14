@@ -4,7 +4,7 @@ const router = express.Router();
 
 // In-memory storage for admin config (in production, you'd use a database)
 let globalAdminConfig = {
-  imageSource: "stock",
+  imageSource: "pollinations",
   debugMode: false,
   maxDesignsPerGeneration: 3,
   enableMultiShirtSelection: true,
