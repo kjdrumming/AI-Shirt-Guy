@@ -1,5 +1,7 @@
 // Simplified Printify integration for the core flow
 import { getShirtPrice, getBlueprintId, getPrintProviderId } from "@/lib/adminConfig";
+import { calculatePrintifyPositioning } from "@/lib/printifyPositioning";
+import type { ImageShape, AspectRatio } from "@/lib/utils";
 
 export interface PrintifyVariant {
   id: number;
@@ -241,7 +243,9 @@ class PrintifyIntegrationService {
     title: string,
     description: string,
     designImageId: string,
-    variantId: number | string
+    variantId: number | string,
+    shape: ImageShape = 'square',
+    aspectRatio: AspectRatio = '1:1'
   ): Promise<string> {
     try {
       console.log('🔵 Creating product with design...');
@@ -253,6 +257,10 @@ class PrintifyIntegrationService {
       }
       
       console.log('🔵 Using variant ID:', variantIdInt, 'for product creation');
+      
+      // Calculate positioning based on shape and aspect ratio
+      const positioning = calculatePrintifyPositioning(shape, aspectRatio);
+      console.log('🎯 Calculated positioning:', positioning);
       
       const productData = {
         title,
@@ -275,10 +283,10 @@ class PrintifyIntegrationService {
                 images: [
                   {
                     id: designImageId,
-                    x: 0.5,
-                    y: 0.5,
-                    scale: 1,
-                    angle: 0
+                    x: positioning.x,
+                    y: positioning.y,
+                    scale: positioning.scale,
+                    angle: positioning.angle
                   }
                 ]
               }
@@ -352,7 +360,9 @@ class PrintifyIntegrationService {
     designImageUrl: string,
     title: string,
     description: string,
-    variantId: number | string
+    variantId: number | string,
+    shape: ImageShape = 'square',
+    aspectRatio: AspectRatio = '1:1'
   ): Promise<PrintifyProduct> {
     try {
       console.log('🚀 Starting product creation flow...');
@@ -361,8 +371,9 @@ class PrintifyIntegrationService {
       const imageId = await this.uploadImage(designImageUrl);
       console.log('✅ Image uploaded with ID:', imageId);
       
-      // Step 2: Create the product
-      const productId = await this.createProduct(title, description, imageId, variantId);
+      // Step 2: Create the product with embedded design URL
+      const enhancedDescription = `${description}\n\n[ORIGINAL_DESIGN_URL:${designImageUrl}]`;
+      const productId = await this.createProduct(title, enhancedDescription, imageId, variantId, shape, aspectRatio);
       console.log('✅ Product created with ID:', productId);
       // Product is created but NOT published
       

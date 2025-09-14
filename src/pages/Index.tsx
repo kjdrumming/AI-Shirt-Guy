@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { PromptInput } from "@/components/PromptInput";
 import { DesignDisplay } from "@/components/DesignDisplay";
 import { ShirtTemplates } from "@/components/ShirtTemplates";
 import { OrderSummary } from "@/components/OrderSummary";
 import { StripeCheckout } from "@/components/StripeCheckout";
 import { ShippingAddressForm, type ShippingAddress } from "@/components/ShippingAddressForm";
+import { TopProducts } from "@/components/TopProducts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,16 +16,21 @@ import { Sparkles, Shirt, CheckCircle, ArrowLeft, Wand2, Image, Loader2, X, Zoom
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { generateImages, cleanupImageUrls, type GeneratedImage } from "@/services/huggingface";
+import type { ImageShape, AspectRatio } from "@/lib/utils";
 import { generateStockImages, cleanupStockImages, type StockImage } from "@/services/stockImages";
 import { pollinationsService, cleanupPollinationsImages, type PollinationsImage } from "@/services/pollinations";
 import { printifyIntegration, type PrintifyProduct } from "../services/printifyIntegration";
 import { getCurrentImageSource, getCurrentImageSourceAsync, isDebugModeEnabled, getMaxDesignsPerGeneration, isMultiShirtSelectionEnabled, isMaintenanceModeEnabled, getShirtPrice } from "@/lib/adminConfig";
+import { extractOriginalDesignUrl } from "@/lib/productMetadata";
 
 interface Design {
   id: string;
   imageUrl: string;
   title: string;
   prompt: string;
+  originalPrompt?: string; // Store original user prompt for cleaner display
+  shape: ImageShape;
+  aspectRatio: AspectRatio;
 }
 
 interface ShirtTemplate {
@@ -39,6 +46,8 @@ type AppStep = "prompt" | "designs" | "variants" | "creating" | "payment" | "str
 type ImageMode = "stock" | "huggingface" | "pollinations";
 
 const Index = () => {
+  const location = useLocation();
+  
   // Check for maintenance mode
   if (isMaintenanceModeEnabled()) {
     return (
@@ -85,6 +94,194 @@ const Index = () => {
   const [selectedProductImageIndex, setSelectedProductImageIndex] = useState<number>(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
   const [activeGalleryShirtIndex, setActiveGalleryShirtIndex] = useState<number>(-1);
+  const [featuredProductOrder, setFeaturedProductOrder] = useState<{
+    productId: string;
+    variantId: number;
+    quantity: number;
+    totalPrice: number;
+    productTitle: string;
+    productDescription: string;
+    originalColor?: string; // Store original featured product color for comparison
+  } | null>(null);  // Check for featured product workflow navigation from TopProducts modal
+  useEffect(() => {
+    if (location.state?.featuredProductWorkflow && !featuredProductOrder) {
+      const workflowData = location.state.featuredProductWorkflow;
+      console.log('🎯 Featured product workflow detected:', workflowData);
+      
+      // Clear the navigation state to prevent re-triggering
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      // For featured products, we don't create new products - we order the existing one
+      // Store the order details for after payment/shipping
+      setFeaturedProductOrder({
+        productId: workflowData.originalProduct.id,
+        variantId: workflowData.selectedVariant.id,
+        quantity: 1,
+        totalPrice: getShirtPrice() / 100, // Convert from cents to dollars
+        productTitle: workflowData.originalProduct.title,
+        productDescription: `${workflowData.originalProduct.title} (${workflowData.selectedVariant.options?.color || ''} ${workflowData.selectedVariant.options?.size || ''})`
+      });
+
+      // Fetch full product data to get all images
+      const fetchFullProductData = async () => {
+        try {
+          const response = await fetch(`/api/printify/shops/24294177/products/${workflowData.originalProduct.id}.json`);
+          if (response.ok) {
+            const fullProduct = await response.json();
+            console.log('✅ Fetched full product data with images:', fullProduct.images?.length || 0, 'images');
+            
+            // Extract original design URL from product description, fallback to mockup
+            const originalDesignUrl = extractOriginalDesignUrl(fullProduct.description || '');
+            const designImageUrl = originalDesignUrl || fullProduct.images?.[0]?.src || '';
+            
+            if (originalDesignUrl) {
+              console.log('✅ Using original design URL for featured product:', originalDesignUrl);
+            } else {
+              console.warn('⚠️ No original design URL found for featured product, using mockup');
+            }
+            
+            // Set up the selected shirts array for display purposes with full product data
+            const featuredShirt = {
+              design: {
+                id: fullProduct.id,
+                imageUrl: designImageUrl,
+                title: fullProduct.title,
+                prompt: fullProduct.description || fullProduct.title,
+                shape: 'square' as ImageShape,
+                aspectRatio: '1:1' as AspectRatio
+              },
+              color: workflowData.selectedVariant.options?.color || '',
+              size: workflowData.selectedVariant.options?.size || '',
+              variant: workflowData.selectedVariant,
+              product: {
+                id: fullProduct.id,
+                title: fullProduct.title || 'Featured Product',
+                description: fullProduct.description || 'Premium quality product available for immediate order.',
+                images: fullProduct.images || []
+              } // Include full product images for preview
+            };
+            
+            // Store original product color for color matching comparison
+            // Get the first variant color as the "original" color that the preview images show
+            console.log('🔍 Debugging variant extraction:');
+            console.log('  fullProduct.variants keys:', Object.keys(fullProduct.variants));
+            console.log('  fullProduct.variants structure:', fullProduct.variants);
+            
+            const originalVariantId = Object.keys(fullProduct.variants)[0];
+            const originalVariant = fullProduct.variants[originalVariantId];
+            console.log('  originalVariantId:', originalVariantId);
+            console.log('  originalVariant:', originalVariant);
+            console.log('  originalVariant.options:', originalVariant?.options);
+            
+            // Try different ways to get the original color
+            let originalColor = '';
+            
+            console.log('🔍 Analyzing originalVariant structure:');
+            console.log('  originalVariant:', originalVariant);
+            console.log('  originalVariant.options:', originalVariant?.options);
+            console.log('  originalVariant.title:', originalVariant?.title);
+            
+            // Check if options is an object with direct color property
+            if (originalVariant?.options?.color) {
+              originalColor = originalVariant.options.color;
+              console.log('🎯 Found color in options.color:', originalColor);
+            }
+            // Check if options is an object with Color property (capital C)
+            else if (originalVariant?.options?.Color) {
+              originalColor = originalVariant.options.Color;
+              console.log('🎯 Found color in options.Color:', originalColor);
+            }
+            // Extract color from variant title if available
+            else if (originalVariant?.title) {
+              const colorMatch = originalVariant.title.match(/\b(Black|White|Navy|Red|Blue|Green|Gray|Grey|Pink|Purple|Yellow|Orange|Brown|Heather\s+\w+|Mauve)\b/i);
+              originalColor = colorMatch ? colorMatch[0] : '';
+              console.log('🎯 Extracted color from title:', originalColor);
+            }
+            // If options is an array, we may need to map it to the blueprint's option structure
+            else if (originalVariant?.options && Array.isArray(originalVariant.options)) {
+              console.log('🔍 Options is array, checking if we can map to blueprint structure...');
+              // This might be variant option IDs that need to be mapped to actual values
+              // For now, we'll skip this complex mapping and use fallback
+              originalColor = '';
+            }
+            
+            // Fallback: Use the selected color as the original if we can't determine the actual original
+            if (!originalColor && workflowData.selectedVariant.options?.color) {
+              // If we can't find the original, at least show a warning if the user picks a different color later
+              originalColor = 'White'; // Most product images are on white/light backgrounds by default
+              console.log('🔄 Using fallback original color:', originalColor);
+            }
+            
+            console.log('🎨 Featured product color info:');
+            console.log('  originalColor:', originalColor);
+            console.log('  selectedColor:', workflowData.selectedVariant.options?.color);
+            console.log('  originalVariantId:', originalVariantId);
+            console.log('  totalVariants:', Object.keys(fullProduct.variants).length);
+            console.log('  fullProduct.variants:', fullProduct.variants);
+            
+            setFeaturedProductOrder(prev => prev ? {
+              ...prev,
+              originalColor: originalColor
+            } : prev);
+            
+            setSelectedShirts([featuredShirt]);
+            
+          } else {
+            console.error('Failed to fetch full product data');
+            // Fallback to basic setup without images
+            setupBasicFeaturedShirt();
+          }
+        } catch (error) {
+          console.error('Error fetching full product data:', error);
+          // Fallback to basic setup without images
+          setupBasicFeaturedShirt();
+        }
+      };
+
+      const setupBasicFeaturedShirt = () => {
+        // Extract original design URL from product description, fallback to mockup
+        const originalDesignUrl = extractOriginalDesignUrl(workflowData.originalProduct.description || '');
+        const designImageUrl = originalDesignUrl || workflowData.originalProduct.image || '';
+        
+        if (originalDesignUrl) {
+          console.log('✅ Using original design URL for featured product:', originalDesignUrl);
+        } else {
+          console.warn('⚠️ No original design URL found for featured product, using fallback');
+        }
+        
+        // Set up the selected shirts array for display purposes with basic data
+        const featuredShirt = {
+          design: {
+            id: workflowData.originalProduct.id,
+            imageUrl: designImageUrl,
+            title: workflowData.originalProduct.title,
+            prompt: workflowData.originalProduct.description || workflowData.originalProduct.title,
+            shape: 'square' as ImageShape,
+            aspectRatio: '1:1' as AspectRatio
+          },
+          color: workflowData.selectedVariant.options?.color || '',
+          size: workflowData.selectedVariant.options?.size || '',
+          variant: workflowData.selectedVariant,
+          product: {
+            id: workflowData.originalProduct.id,
+            title: workflowData.originalProduct.title || 'Featured Product',
+            description: workflowData.originalProduct.description || 'Premium quality product available for immediate order.',
+            images: [] // No images available
+          }
+        };
+        
+        setSelectedShirts([featuredShirt]);
+      };
+
+      // Fetch full product data
+      fetchFullProductData();
+      
+      // Jump directly to payment step
+      setCurrentStep('payment');
+      
+      toast.success(`Featured product ready for payment: ${workflowData.originalProduct.title}`);
+    }
+  }, [location.state]);
 
   // Cleanup blob URLs when component unmounts or designs change
   useEffect(() => {
@@ -175,7 +372,7 @@ const Index = () => {
     });
   };
 
-  const handleGenerate = async (prompt: string) => {
+  const handleGenerate = async (prompt: string, shape: ImageShape = 'square', aspectRatio: AspectRatio = '1:1') => {
     setIsGenerating(true);
     setCurrentStep("designs"); // Stay on designs step while loading
     setIsLoadingVariants(true); // Start loading variants immediately
@@ -187,7 +384,7 @@ const Index = () => {
         if (currentImageMode === "huggingface") {
           toast.info("AI is creating your designs...");
           const maxDesigns = getMaxDesignsPerGeneration();
-          const generatedImages = await generateImages(prompt, maxDesigns);
+          const generatedImages = await generateImages(prompt, shape, aspectRatio, maxDesigns);
           setDesigns(generatedImages);
           
           // Wait for images to actually load
@@ -199,7 +396,7 @@ const Index = () => {
         } else if (currentImageMode === "pollinations") {
           toast.info("Pollinations.ai is creating your designs...");
           const maxDesigns = getMaxDesignsPerGeneration();
-          const pollinationsImages = await pollinationsService.generateImages(prompt, maxDesigns);
+          const pollinationsImages = await pollinationsService.generateImages(prompt, shape, aspectRatio, maxDesigns);
           setDesigns(pollinationsImages);
           
           // Wait for images to actually load
@@ -211,7 +408,7 @@ const Index = () => {
         } else {
           toast.info("Loading curated stock designs...");
           const maxDesigns = getMaxDesignsPerGeneration();
-          const stockImages = await generateStockImages(prompt, maxDesigns);
+          const stockImages = await generateStockImages(prompt, shape, aspectRatio, maxDesigns);
           setDesigns(stockImages);
           
           // Wait for images to actually load
@@ -321,7 +518,9 @@ const Index = () => {
           design.imageUrl,
           design.title,
           design.prompt || design.title,
-          config.variant.id
+          config.variant.id,
+          design.shape || 'square',
+          design.aspectRatio || '1:1'
         );
         
         createdProducts.push({
@@ -389,44 +588,83 @@ const Index = () => {
     }
 
     try {
-      toast.info("Processing multi-shirt order...");
-      
-      // Create line items from the created products
-      const lineItems = selectedShirts.map(shirt => ({
-        product_id: shirt.product?.id,
-        variant_id: shirt.variant.id,
-        quantity: 1
-      }));
+      // Check if this is a featured product order (direct ordering) 
+      if (featuredProductOrder) {
+        toast.info("Placing your featured product order...");
+        
+        // Order the existing featured product directly
+        const orderData = {
+          external_id: `featured-order-${Date.now()}`,
+          line_items: [{
+            product_id: featuredProductOrder.productId,
+            variant_id: featuredProductOrder.variantId,
+            quantity: featuredProductOrder.quantity
+          }],
+          shipping_method: 1,
+          is_printify_express: false,
+          send_shipping_notification: false,
+          address_to: address
+        };
 
-      // Submit order directly using the created products
-      const orderData = {
-        external_id: `multi-order-${Date.now()}`,
-        line_items: lineItems,
-        shipping_method: 1,
-        is_printify_express: false,
-        send_shipping_notification: false,
-        address_to: address
-      };
+        const response = await fetch("/api/printify/shops/24294177/orders.json", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(orderData)
+        });
 
-      const response = await fetch("/api/printify/shops/24294177/orders.json", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(orderData)
-      });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText);
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
+        const result = await response.json();
+        console.log('✅ Featured product order placed:', result);
+        toast.success("Featured product order placed successfully! 🎉");
+        
+      } else {
+        // Regular multi-shirt order (created products)
+        toast.info("Processing multi-shirt order...");
+        
+        // Create line items from the created products
+        const lineItems = selectedShirts.map(shirt => ({
+          product_id: shirt.product?.id,
+          variant_id: shirt.variant.id,
+          quantity: 1
+        }));
+
+        // Submit order directly using the created products
+        const orderData = {
+          external_id: `multi-order-${Date.now()}`,
+          line_items: lineItems,
+          shipping_method: 1,
+          is_printify_express: false,
+          send_shipping_notification: false,
+          address_to: address
+        };
+
+        const response = await fetch("/api/printify/shops/24294177/orders.json", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(orderData)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText);
+        }
+
+        const result = await response.json();
+        toast.success("Multi-shirt order placed successfully! 🎉");
       }
-
-      const result = await response.json();
-      toast.success("Multi-shirt order placed successfully! 🎉");
+      
       setCurrentStep("success");
     } catch (error) {
-      console.error('Failed to create multi-shirt order:', error);
-      toast.error("Failed to process multi-shirt order. Please try again.");
+      console.error('Failed to place order:', error);
+      toast.error("Failed to place order. Please try again.");
       setCurrentStep("stripe");
     }
   };
@@ -439,16 +677,27 @@ const Index = () => {
     try {
       toast.info("Canceling products...");
       
-      // Delete all created products from Printify
+      // Delete all created products from Printify (only for custom products, not featured)
       for (const shirt of selectedShirts) {
-        if (shirt.product?.id) {
+        if (shirt.product?.id && !featuredProductOrder) {
           await printifyIntegration.deleteProduct(shirt.product.id);
         }
       }
       
       toast.success("Products canceled successfully");
       setSelectedShirts([]);
-      setCurrentStep("variants"); // Go back to variant selection
+      
+      // For featured products, go back to prompt (start over)
+      // For custom products, go back to variant selection
+      if (featuredProductOrder) {
+        setFeaturedProductOrder(null);
+        // Clear any navigation state that might re-trigger featured product workflow
+        window.history.replaceState({}, '', window.location.pathname);
+        setCurrentStep("prompt");
+        toast.info("Returning to start - select a new design or featured product");
+      } else {
+        setCurrentStep("variants");
+      }
       
     } catch (error) {
       console.error('Failed to delete products:', error);
@@ -484,6 +733,7 @@ const Index = () => {
     setIsCreatingProduct(false);
     setConfigModalOpen(false);
     setCurrentConfigDesign(null);
+    setFeaturedProductOrder(null); // Clear featured product state
   };
 
   const stepTitles = {
@@ -522,11 +772,21 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 p-3 rounded-xl shadow-lg">
-                <Shirt className="h-7 w-7 text-white" />
-                <div className="absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full p-1">
+              <div className={`relative bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 p-3 rounded-xl shadow-lg ${
+                currentStep === "creating" ? "animate-pulse" : ""
+              }`}>
+                <Shirt className={`h-7 w-7 text-white ${
+                  currentStep === "creating" ? "animate-pulse" : ""
+                }`} />
+                <div className={`absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full p-1 ${
+                  currentStep === "creating" ? "animate-bounce" : ""
+                }`}>
                   <Sparkles className="h-3 w-3 text-white" />
                 </div>
+                {/* Extra glow effect when creating */}
+                {currentStep === "creating" && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 rounded-xl opacity-40 animate-ping"></div>
+                )}
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">AI Shirt Guy</h1>
@@ -586,10 +846,15 @@ const Index = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {currentStep === "prompt" && (
-          <PromptInput 
-            onGenerate={handleGenerate} 
-            isGenerating={isGenerating}
-          />
+          <div className="space-y-8">
+            <PromptInput 
+              onGenerate={handleGenerate} 
+              isGenerating={isGenerating}
+            />
+            
+            {/* Top Products Section */}
+            <TopProducts />
+          </div>
         )}
 
         {currentStep === "designs" && (
@@ -657,7 +922,7 @@ const Index = () => {
 
         {currentStep === "variants" && (
           <div className="max-w-6xl mx-auto space-y-8">
-            {/* Design Selection */}
+            {/* Regular AI Design Selection */}
             <div className="space-y-4">
               <div className="text-center">
                 <Badge variant={(() => {
@@ -684,95 +949,102 @@ const Index = () => {
               />
             </div>
 
-            {/* Configuration Modal */}
-            <Dialog open={configModalOpen} onOpenChange={setConfigModalOpen}>
-              <DialogContent className="w-[95vw] sm:w-[95vw] sm:max-w-lg max-h-[90vh] sm:h-fit sm:max-h-[90vh] overflow-hidden sm:overflow-visible flex flex-col sm:block p-4 sm:p-4">
-                <div className="space-y-1">
-                  <DialogTitle className="text-lg sm:text-lg">Configure Your Shirt</DialogTitle>
-                  <DialogDescription className="text-sm sm:text-sm">
-                    Choose color and size for "{currentConfigDesign?.title}"
-                  </DialogDescription>
-                </div>
-                
-                <div className="flex-1 sm:flex-none overflow-y-auto sm:overflow-visible">
-                  {currentConfigDesign && availableVariants.length > 0 && (
-                    <ConfigurationForm 
-                      design={currentConfigDesign}
-                      availableVariants={availableVariants}
-                      onSubmit={handleConfigSubmit}
-                      onCancel={() => setConfigModalOpen(false)}
-                    />
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
+                {/* Configuration Modal */}
+                <Dialog open={configModalOpen} onOpenChange={setConfigModalOpen}>
+                  <DialogContent className="w-[95vw] sm:w-[95vw] sm:max-w-lg max-h-[90vh] sm:h-fit sm:max-h-[90vh] overflow-hidden sm:overflow-visible flex flex-col sm:block p-4 sm:p-4">
+                    <div className="space-y-1">
+                      <DialogTitle className="text-lg sm:text-lg">Configure Your Shirt</DialogTitle>
+                      <DialogDescription className="text-sm sm:text-sm">
+                        Choose color and size for "{currentConfigDesign?.title}"
+                      </DialogDescription>
+                    </div>
+                    
+                    <div className="flex-1 sm:flex-none overflow-y-auto sm:overflow-visible">
+                      {currentConfigDesign && availableVariants.length > 0 && (
+                        <ConfigurationForm 
+                          design={currentConfigDesign}
+                          availableVariants={availableVariants}
+                          onSubmit={handleConfigSubmit}
+                          onCancel={() => setConfigModalOpen(false)}
+                        />
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
 
-            {/* Selected Designs Summary */}
-            {selectedDesigns.length > 0 && (
-              <Card className="shadow-card">
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-bold mb-4 text-center">
-                    Selected Designs ({selectedDesigns.length}/3)
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {selectedDesigns.map((design, index) => {
-                      const config = designConfigs[design.id];
-                      return (
-                        <div key={design.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                          <img 
-                            src={design.imageUrl} 
-                            alt={design.title}
-                            className="w-12 h-12 rounded border object-cover"
-                          />
-                          <div className="flex-1">
-                            <h4 className="font-medium text-sm">{design.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              {config ? `${config.color} • ${config.size}` : 'Configured'}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSelectDesign(design)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                {/* Selected Designs Summary */}
+                {selectedDesigns.length > 0 && (
+                  <Card className="shadow-card">
+                    <CardContent className="p-6">
+                      <h3 className="text-xl font-bold mb-4 text-center">
+                        Selected Designs ({selectedDesigns.length}/3)
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        {selectedDesigns.map((design, index) => {
+                          const config = designConfigs[design.id];
+                          return (
+                            <div key={design.id} className="flex items-center gap-4 p-3 border rounded-lg">
+                              <img 
+                                src={design.imageUrl} 
+                                alt={design.title}
+                                className="w-12 h-12 rounded border object-cover"
+                              />
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm">{design.title}</h4>
+                                <p className="text-xs text-muted-foreground">
+                                  {config ? `${config.color} • ${config.size}` : 'Configured'}
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSelectDesign(design)}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                  {selectedDesigns.length < 3 && (
-                    <p className="text-center text-sm text-muted-foreground mt-4">
-                      You can select {3 - selectedDesigns.length} more design(s)
-                    </p>
-                  )}
-                  
-                  <Button
-                    variant="creative"
-                    size="lg"
-                    className="w-full mt-6"
-                    disabled={selectedDesigns.length === 0}
-                    onClick={handleCreateProduct}
-                  >
-                    Proceed to Payment ({selectedDesigns.length} shirt{selectedDesigns.length !== 1 ? 's' : ''})
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+                      {selectedDesigns.length < 3 && (
+                        <p className="text-center text-sm text-muted-foreground mt-4">
+                          You can select {3 - selectedDesigns.length} more design(s)
+                        </p>
+                      )}
+                      
+                      <Button
+                        variant="creative"
+                        size="lg"
+                        className="w-full mt-6"
+                        disabled={selectedDesigns.length === 0}
+                        onClick={handleCreateProduct}
+                      >
+                        Proceed to Payment ({selectedDesigns.length} shirt{selectedDesigns.length !== 1 ? 's' : ''})
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
           </div>
         )}
 
         {currentStep === "creating" && (
           <div className="max-w-md mx-auto text-center">
             <Card className="shadow-card">
-              <CardContent className="p-8 space-y-6">
-                <div className="space-y-4">
-                  <div className="bg-blue-50 p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+              <CardContent className="p-12 space-y-8">
+                <div className="space-y-6">
+                  {/* Large animated shirt logo */}
+                  <div className="relative mx-auto w-20 h-20 bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 rounded-xl shadow-lg flex items-center justify-center animate-pulse">
+                    <Shirt className="h-10 w-10 text-white animate-pulse" />
+                    <div className="absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full p-1.5 animate-bounce">
+                      <Sparkles className="h-4 w-4 text-white" />
+                    </div>
+                    {/* Glowing effect */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 rounded-xl opacity-30 animate-ping"></div>
                   </div>
+                  
                   <div>
                     <h2 className="text-2xl font-bold">Creating Your T-Shirt</h2>
                     <p className="text-muted-foreground mt-2">
@@ -783,7 +1055,7 @@ const Index = () => {
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-center gap-2">
-                    <Badge variant="secondary">Processing with Printify</Badge>
+                    <Badge variant="secondary" className="animate-pulse">Processing with Printify</Badge>
                   </div>
                   <p className="text-muted-foreground">
                     This may take a few moments
@@ -794,36 +1066,10 @@ const Index = () => {
           </div>
         )}
 
-        {currentStep === "creating" && (
-          <div className="max-w-md mx-auto text-center">
-            <Card className="shadow-card">
-              <CardContent className="p-8 space-y-6">
-                <div className="space-y-4">
-                  <div className="bg-blue-50 p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Creating Your T-Shirt</h2>
-                    <p className="text-muted-foreground mt-2">
-                      Uploading your design to Printify and creating your custom product...
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-center gap-2">
-                    <Badge variant="secondary">Processing with Printify</Badge>
-                  </div>
-                  <p className="text-muted-foreground">
-                    This may take a few moments
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {currentStep === "payment" && selectedShirts.length > 0 && selectedShirts.every(shirt => shirt.product) && (
+        {currentStep === "payment" && (
+          (selectedShirts.length > 0 && selectedShirts.every(shirt => shirt.product)) || 
+          featuredProductOrder
+        ) && (
           <div className="max-w-2xl mx-auto space-y-6">
             <Card className="shadow-card">
               <CardContent className="p-8 space-y-6">
@@ -832,7 +1078,9 @@ const Index = () => {
                     <CheckCircle className="h-8 w-8 text-success" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold">Your Shirts are Ready!</h2>
+                    <h2 className="text-2xl font-bold">
+                      Your Shirts are Ready!
+                    </h2>
                     <p className="text-muted-foreground mt-2">
                       {selectedShirts.length} custom design{selectedShirts.length > 1 ? 's' : ''} ready for order
                     </p>
@@ -855,9 +1103,49 @@ const Index = () => {
                           </p>
                         </div>
                         
-                        {/* Large Product Preview with Modal Gallery - Same size as design selection */}
+                        {/* Product Preview */}
                         {shirt.product && shirt.product.images && shirt.product.images.length > 0 && (
                           <div className="space-y-4">
+                            {/* Color mismatch warning for featured products */}
+                            {featuredProductOrder && (() => {
+                              const selectedColor = shirt.color.toLowerCase().trim();
+                              const originalColor = (featuredProductOrder.originalColor || '').toLowerCase().trim();
+                              const colorsMatch = selectedColor === originalColor;
+                              
+                              console.log('🎨 Color comparison in payment step:');
+                              console.log('  shirt.color:', shirt.color);
+                              console.log('  selectedColor (processed):', selectedColor);
+                              console.log('  featuredProductOrder.originalColor:', featuredProductOrder.originalColor);
+                              console.log('  originalColor (processed):', originalColor);
+                              console.log('  colorsMatch:', colorsMatch);
+                              console.log('  featuredProductOrder exists:', !!featuredProductOrder);
+                              console.log('  hasOriginalColor:', !!featuredProductOrder.originalColor);
+                              
+                              // Show warning if colors don't match AND we have an original color
+                              if (!colorsMatch && featuredProductOrder.originalColor) {
+                                return (
+                                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                                    <div className="flex items-start gap-2">
+                                      <div className="text-amber-600 mt-0.5">
+                                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium text-amber-800 mb-1">
+                                          Preview Color Notice
+                                        </p>
+                                        <p className="text-xs text-amber-700">
+                                          Preview shows <span className="font-medium">{featuredProductOrder.originalColor}</span> but you selected <span className="font-medium">{shirt.color}</span>. Your shirt will be {shirt.color}.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            
                             <Dialog open={isImageModalOpen && activeGalleryShirtIndex === index} onOpenChange={(open) => {
                               setIsImageModalOpen(open);
                               if (open) {
@@ -965,17 +1253,6 @@ const Index = () => {
                     Pay & Order Now - ${(selectedShirts.length * (getShirtPrice() / 100)).toFixed(2)}
                   </Button>
                   
-                  {/* Development/Testing Button */}
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="w-full border-dashed border-orange-300 text-orange-600 hover:bg-orange-50" 
-                    onClick={handleDevFreePayment}
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Dev Free Payment (Skip Stripe)
-                  </Button>
-                  
                   <div className="flex gap-4">
                     <Button 
                       variant="outline" 
@@ -996,21 +1273,26 @@ const Index = () => {
                     </Button>
                   </div>
                 </div>
-
-                <div className="text-center text-sm text-muted-foreground">
-                  <p>Choose "Pay & Order Now" for real Stripe payment or "Dev Free Payment" for testing</p>
-                </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {currentStep === "stripe" && selectedShirts.length > 0 && (
+        {currentStep === "stripe" && (selectedShirts.length > 0 || featuredProductOrder) && (
           <div className="max-w-2xl mx-auto">
             <StripeCheckout
-              amount={selectedShirts.length * (getShirtPrice() / 100)}
-              productTitle={`${selectedShirts.length} Custom Shirt${selectedShirts.length > 1 ? 's' : ''}`}
-              productDescription={selectedShirts.map(s => `${s.design.title} (${s.color} ${s.size})`).join(', ')}
+              amount={featuredProductOrder 
+                ? featuredProductOrder.totalPrice 
+                : selectedShirts.length * (getShirtPrice() / 100)
+              }
+              productTitle={featuredProductOrder 
+                ? featuredProductOrder.productTitle 
+                : `${selectedShirts.length} Custom Shirt${selectedShirts.length > 1 ? 's' : ''}`
+              }
+              productDescription={featuredProductOrder 
+                ? featuredProductOrder.productDescription 
+                : selectedShirts.map(s => `${s.design.title} (${s.color} ${s.size})`).join(', ')
+              }
               onPaymentSuccess={handlePaymentSuccess}
               onPaymentError={handlePaymentError}
               onCancel={() => setCurrentStep("payment")}

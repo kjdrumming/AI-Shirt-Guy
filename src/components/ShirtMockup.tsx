@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { getShapeStyles, type ImageShape, type AspectRatio } from "@/lib/utils";
+import { calculatePrintifyPositioning } from "@/lib/printifyPositioning";
 // Import white shirt template
 import shirtWhite from "@/assets/shirt-template-white.jpg";
 
@@ -6,12 +8,16 @@ interface ShirtMockupProps {
   designUrl: string;
   className?: string;
   onImageError?: () => void;
+  shape?: ImageShape;
+  aspectRatio?: AspectRatio;
 }
 
 export function ShirtMockup({ 
   designUrl, 
   className = "", 
-  onImageError
+  onImageError,
+  shape = 'square',
+  aspectRatio = '1:1'
 }: ShirtMockupProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [designImageError, setDesignImageError] = useState(false);
@@ -36,11 +42,14 @@ export function ShirtMockup({
   const getDesignPosition = () => {
     if (!containerDimensions.width || !containerDimensions.height) return null;
     
-    // Standard t-shirt design placement
+    // Use the same positioning logic as Printify for consistency
+    const printifyCoords = calculatePrintifyPositioning(shape, aspectRatio);
+    
+    // Convert Printify coordinates to pixel positioning for preview
     const designCoords = {
-      x: 0.5,        // Center horizontally 
-      y: 0.4,        // Positioned in upper torso area
-      scale: 0.6,     // 60% of print area size
+      x: printifyCoords.x,        // Use calculated x position
+      y: printifyCoords.y,        // Use calculated y position  
+      scale: printifyCoords.scale * 0.75,  // Scale down for preview (Printify uses larger scale)
     };
     
     // Define the print area boundaries on the shirt
@@ -120,7 +129,7 @@ export function ShirtMockup({
             <div 
               className="absolute"
               style={{
-                top: '25%',
+                top: `${calculatePrintifyPositioning(shape, aspectRatio).y * 100}%`,
                 left: '20%',
                 width: '60%',
                 height: '50%',

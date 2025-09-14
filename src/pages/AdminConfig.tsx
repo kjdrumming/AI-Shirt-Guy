@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Save, RefreshCw, Lock, Unlock, Search, ExternalLink } from "lucide-react";
+import { Settings, Save, RefreshCw, Lock, Unlock, Search, ExternalLink, Star } from "lucide-react";
 import { toast } from "sonner";
 import { 
   getAdminConfig, 
@@ -36,7 +37,21 @@ interface PrintProvider {
   location?: string;
 }
 
-const AdminConfigPage = () => {
+interface Product {
+  id: string;
+  title: string;
+  description: string;
+  image: {
+    src: string;
+    variant_ids: number[];
+    position: string;
+    is_default: boolean;
+    is_selected_for_publishing: boolean;
+    order: number | null;
+  } | null;
+  price: number | null;
+  created_at: string;
+}const AdminConfigPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [globalConfig, setGlobalConfig] = useState<AdminConfig>({
@@ -48,7 +63,8 @@ const AdminConfigPage = () => {
     maintenanceMode: false,
     shirtPrice: 2499,
     blueprintId: 6,
-    printProviderId: 103
+    printProviderId: 103,
+    featuredProducts: []
   });
   const [localSettings, setLocalSettings] = useState<LocalAdminSettings>({
     adminPassword: "admin123",
@@ -66,6 +82,11 @@ const AdminConfigPage = () => {
   const [providerSearchLoading, setProviderSearchLoading] = useState(false);
   const [selectedBlueprintForProviders, setSelectedBlueprintForProviders] = useState<number>(6);
 
+  // Product selection state
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [availableProductsLoading, setAvailableProductsLoading] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+
   // Load config from backend and local settings on component mount
   useEffect(() => {
     const loadConfigs = async () => {
@@ -77,6 +98,9 @@ const AdminConfigPage = () => {
         // Load local settings from localStorage
         const localSettingsData = getLocalAdminSettings();
         setLocalSettings(localSettingsData);
+
+        // Load available products
+        await loadAvailableProducts();
       } catch (error) {
         console.error('Failed to load admin configs:', error);
         toast.error('Failed to load configuration');
@@ -85,6 +109,51 @@ const AdminConfigPage = () => {
     
     loadConfigs();
   }, []);
+
+  // Load available products for selection
+  const loadAvailableProducts = async () => {
+    setAvailableProductsLoading(true);
+    try {
+      const response = await fetch('/api/products/all-products');
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableProducts(data.data || []);
+        console.log('✅ Loaded available products for selection:', data.data?.length || 0);
+      } else {
+        console.error('Failed to load products:', response.status);
+        toast.error('Failed to load available products');
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error('Error loading available products');
+    } finally {
+      setAvailableProductsLoading(false);
+    }
+  };
+
+  // Toggle product selection
+  const toggleProductSelection = (productId: string) => {
+    setGlobalConfig(prev => {
+      const isSelected = prev.featuredProducts.includes(productId);
+      const newFeaturedProducts = isSelected
+        ? prev.featuredProducts.filter(id => id !== productId)
+        : [...prev.featuredProducts, productId];
+      
+      return {
+        ...prev,
+        featuredProducts: newFeaturedProducts
+      };
+    });
+  };
+
+  // Clear all featured products
+  const clearAllFeaturedProducts = () => {
+    setGlobalConfig(prev => ({
+      ...prev,
+      featuredProducts: []
+    }));
+    toast.success('All featured products cleared');
+  };
 
   // Save config to backend and local settings
   const saveConfig = async () => {
@@ -146,7 +215,8 @@ const AdminConfigPage = () => {
       maintenanceMode: false,
       shirtPrice: 2499,
       blueprintId: 6,
-      printProviderId: 103
+      printProviderId: 103,
+      featuredProducts: []
     });
     setLocalSettings({
       adminPassword: "admin123",
@@ -610,6 +680,113 @@ const AdminConfigPage = () => {
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Featured Products Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5" />
+              Featured Products Management
+            </CardTitle>
+            <CardDescription>
+              Select which products to feature on the homepage. Products will appear in the order selected.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Load Products Button */}
+            <div className="space-y-3">
+              <Button 
+                onClick={loadAvailableProducts} 
+                disabled={availableProductsLoading}
+                variant="outline"
+                className="w-full"
+              >
+                {availableProductsLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Loading Products...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Load Available Products
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Product Selection */}
+            {availableProducts.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-medium">
+                    Select Products to Feature ({globalConfig.featuredProducts?.length || 0}/5 selected)
+                  </Label>
+                  <Button 
+                    onClick={clearAllFeaturedProducts}
+                    variant="outline"
+                    size="sm"
+                    disabled={!globalConfig.featuredProducts?.length}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 max-h-96 overflow-y-auto">
+                  {availableProducts.map((product) => (
+                    <div 
+                      key={product.id} 
+                      className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                        globalConfig.featuredProducts?.includes(product.id) 
+                          ? 'bg-blue-50 border-blue-200' 
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={globalConfig.featuredProducts?.includes(product.id) || false}
+                        onCheckedChange={() => toggleProductSelection(product.id)}
+                        disabled={
+                          !globalConfig.featuredProducts?.includes(product.id) && 
+                          (globalConfig.featuredProducts?.length || 0) >= 5
+                        }
+                      />
+                      
+                      {/* Product Image */}
+                      {product.image?.src && (
+                        <div className="flex-shrink-0">
+                          <img 
+                            src={product.image.src} 
+                            alt={product.title}
+                            className="w-20 h-20 object-cover rounded-lg border shadow-sm"
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Product Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{product.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          ID: {product.id}
+                        </p>
+                        {product.price && (
+                          <p className="text-sm font-medium text-green-600">
+                            ${(product.price / 100).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {availableProducts.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">
+                    No products found. Make sure you have products in your Printify shop.
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

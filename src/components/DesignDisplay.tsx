@@ -5,12 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Heart, ShoppingCart, AlertCircle, Download, X } from "lucide-react";
 import { ShirtMockup } from "@/components/ShirtMockup";
+import { getShapeStyles, type ImageShape, type AspectRatio } from "@/lib/utils";
 
 interface Design {
   id: string;
   imageUrl: string;
   title: string;
   prompt: string;
+  originalPrompt?: string; // Store original user prompt for cleaner display
+  shape: ImageShape;
+  aspectRatio: AspectRatio;
 }
 
 interface DesignDisplayProps {
@@ -94,6 +98,8 @@ export function DesignDisplay({ designs, onSelectDesign, selectedDesign, selecte
                           designUrl={design.imageUrl}
                           className="w-full h-full transition-transform group-hover:scale-105"
                           onImageError={() => handleImageError(design.id)}
+                          shape={design.shape}
+                          aspectRatio={design.aspectRatio}
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                           <div className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 px-2 py-1 rounded">
@@ -150,7 +156,7 @@ export function DesignDisplay({ designs, onSelectDesign, selectedDesign, selecte
                   <div>
                     <h3 className="font-semibold truncate">{design.title}</h3>
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {design.prompt}
+                      {design.originalPrompt || design.prompt.split(',')[0].trim()}
                     </p>
                   </div>
 
@@ -209,7 +215,7 @@ export function DesignDisplay({ designs, onSelectDesign, selectedDesign, selecte
               <div className="p-6">
                 <div className="text-center mb-4">
                   <h3 className="text-xl font-semibold mb-2">{previewImage.title}</h3>
-                  <p className="text-sm text-muted-foreground">{previewImage.prompt}</p>
+                  <p className="text-sm text-muted-foreground">{previewImage.originalPrompt || previewImage.prompt.split(',')[0].trim()}</p>
                 </div>
                 <div className="flex justify-center">
                   <img

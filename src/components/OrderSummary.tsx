@@ -3,12 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, CreditCard, Truck } from "lucide-react";
+import type { ImageShape, AspectRatio } from "@/lib/utils";
 
 interface Design {
   id: string;
   imageUrl: string;
   title: string;
   prompt: string;
+  originalPrompt?: string; // Store original user prompt for cleaner display
+  shape: ImageShape;
+  aspectRatio: AspectRatio;
 }
 
 interface ShirtTemplate {
@@ -56,7 +60,7 @@ export function OrderSummary({ design, template, color, size, onPlaceOrder }: Or
             <div className="flex-1 space-y-1">
               <h3 className="font-semibold">{design.title}</h3>
               <p className="text-sm text-muted-foreground line-clamp-2">
-                {design.prompt}
+                {design.originalPrompt || design.prompt.split(',')[0].trim()}
               </p>
               <div className="flex gap-2">
                 <Badge variant="outline" className="text-xs">Custom Design</Badge>

@@ -1,32 +1,52 @@
+import { getAspectRatioDimensions } from '@/lib/utils';
+import type { ImageShape, AspectRatio } from '@/lib/utils';
+
 export interface StockImage {
   id: string;
   imageUrl: string;
   title: string;
   prompt: string;
+  originalPrompt?: string; // Store original user prompt for cleaner display
+  shape: ImageShape;
+  aspectRatio: AspectRatio;
 }
 
 /**
  * Generate stock placeholder images using Picsum
  * @param prompt - The text prompt for generating themed stock images
+ * @param shape - The desired shape for the image (used for aspect ratio calculation)
+ * @param aspectRatio - The desired aspect ratio
  * @param count - Number of images to generate (default: 3)
  * @returns Array of stock images with metadata
  */
-export async function generateStockImages(prompt: string, count: number = 3): Promise<StockImage[]> {
+export async function generateStockImages(
+  prompt: string, 
+  shape: ImageShape = 'square', 
+  aspectRatio: AspectRatio = '1:1',
+  count: number = 3
+): Promise<StockImage[]> {
   const results: StockImage[] = [];
   
   try {
+    // Get dimensions based on aspect ratio
+    const dimensions = getAspectRatioDimensions(aspectRatio, 512);
+    
     // Create stock images with different IDs for variety
     const imageIds = [237, 1024, 433, 225, 348, 164, 582, 139, 420, 274]; // Curated nice Picsum image IDs
     
     for (let i = 0; i < count; i++) {
       const imageId = imageIds[i % imageIds.length];
-      const imageUrl = `https://picsum.photos/id/${imageId}/512/512`;
+      // Use aspect ratio for natural image dimensions, let shape be handled by AI prompt concepts
+      const imageUrl = `https://picsum.photos/id/${imageId}/${dimensions.width}/${dimensions.height}`;
       
       results.push({
         id: `stock-${Date.now()}-${i}`,
         imageUrl,
         title: generateStockTitle(prompt, i),
-        prompt: `Stock design inspired by: ${prompt}`,
+        prompt: `Stock design inspired by: ${prompt} with ${shape} composition`,
+        originalPrompt: prompt, // Store original user prompt
+        shape,
+        aspectRatio,
       });
     }
     

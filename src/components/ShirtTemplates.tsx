@@ -21,6 +21,7 @@ interface ShirtTemplatesProps {
     imageUrl: string;
     title: string;
     prompt: string;
+    originalPrompt?: string; // Store original user prompt for cleaner display
   };
 }
 

@@ -168,6 +168,86 @@ router.get('/blueprints/:blueprintId/providers/search', async (req, res) => {
   }
 });
 
+// Get variants for a specific blueprint and print provider
+router.get('/blueprints/:blueprintId/providers/:printProviderId/variants', async (req, res) => {
+  try {
+    const { blueprintId, printProviderId } = req.params;
+
+    console.log(`🎨 Fetching variants for blueprint ${blueprintId} with print provider ${printProviderId}...`);
+    
+    // Fetch variants from Printify API
+    const response = await fetch(`https://api.printify.com/v1/catalog/blueprints/${blueprintId}/print_providers/${printProviderId}/variants.json`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.PRINTIFY_API_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log(`📡 Variants API response status: ${response.status}`);
+
+    if (response.status === 429) {
+      console.warn('⚠️ Printify API rate limited');
+      return res.status(429).json({ error: 'API rate limited, try again later' });
+    }
+
+    if (!response.ok) {
+      console.error(`❌ Variants API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Printify API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const variants = Array.isArray(data) ? data : (data.variants || []);
+    
+    console.log(`🔍 Sample variant structure:`, JSON.stringify(variants[0], null, 2));
+    
+    // Transform variants to match our interface
+    const transformedVariants = variants.map(variant => {
+      // Handle different possible option structures
+      let colorValue = null;
+      let sizeValue = null;
+      
+      if (Array.isArray(variant.options)) {
+        colorValue = variant.options.find(opt => opt.name === 'Color' || opt.name === 'color')?.value;
+        sizeValue = variant.options.find(opt => opt.name === 'Size' || opt.name === 'size')?.value;
+      } else if (variant.options && typeof variant.options === 'object') {
+        colorValue = variant.options.Color || variant.options.color;
+        sizeValue = variant.options.Size || variant.options.size;
+      }
+      
+      return {
+        id: variant.id,
+        title: variant.title,
+        options: {
+          color: colorValue,
+          size: sizeValue
+        },
+        cost: variant.cost || 0,
+        price: variant.price || 0,
+        is_enabled: variant.is_enabled !== false,
+        is_default: variant.is_default || false,
+        is_available: variant.is_available !== false
+      };
+    });
+
+    const result = {
+      blueprint_id: blueprintId,
+      print_provider_id: printProviderId,
+      variants: transformedVariants,
+      total: transformedVariants.length
+    };
+    
+    console.log(`✅ Found ${transformedVariants.length} variants for blueprint ${blueprintId}`);
+    res.json(result);
+
+  } catch (error) {
+    console.error('❌ Error fetching blueprint variants:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch variants',
+      details: error.message 
+    });
+  }
+});
+
 // Clear cache endpoint (for testing/admin use)
 router.post('/cache/clear', (req, res) => {
   blueprintsCache = null;

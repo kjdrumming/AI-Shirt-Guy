@@ -2,11 +2,15 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Wand2, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sparkles, Wand2, RefreshCw, Square, Circle, Triangle } from "lucide-react";
 import { getCurrentImageSource } from "@/lib/adminConfig";
 
+export type ImageShape = 'square' | 'circle' | 'triangle' | 'oval' | 'rectangle' | 'diamond' | 'hexagon';
+export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3';
+
 interface PromptInputProps {
-  onGenerate: (prompt: string) => void;
+  onGenerate: (prompt: string, shape: ImageShape, aspectRatio: AspectRatio) => void;
   isGenerating: boolean;
 }
 
@@ -81,6 +85,8 @@ function getSeasonalContext(): string {
 
 export function PromptInput({ onGenerate, isGenerating }: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
+  const [selectedShape, setSelectedShape] = useState<ImageShape>('square');
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatio>('1:1');
   
   // Generate seasonal default prompts
   const getSeasonalDefaultPrompts = () => {
@@ -190,7 +196,7 @@ export function PromptInput({ onGenerate, isGenerating }: PromptInputProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (prompt.trim() && !isGenerating) {
-      onGenerate(prompt.trim());
+      onGenerate(prompt.trim(), selectedShape, selectedAspectRatio);
     }
   };
 
@@ -323,6 +329,97 @@ export function PromptInput({ onGenerate, isGenerating }: PromptInputProps) {
                 className="min-h-[100px] resize-none"
                 disabled={isGenerating}
               />
+            </div>
+
+            {/* Shape and Aspect Ratio Selectors */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Image Shape</label>
+                <Select value={selectedShape} onValueChange={(value: ImageShape) => setSelectedShape(value)} disabled={isGenerating}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shape" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="square">
+                      <div className="flex items-center gap-2">
+                        <Square className="h-4 w-4" />
+                        Square
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="circle">
+                      <div className="flex items-center gap-2">
+                        <Circle className="h-4 w-4" />
+                        Circle
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="triangle">
+                      <div className="flex items-center gap-2">
+                        <Triangle className="h-4 w-4" />
+                        Triangle
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="oval">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-6 border-2 border-current rounded-full" />
+                        Oval
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="rectangle">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-5 border-2 border-current" />
+                        Rectangle
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="diamond">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 border-2 border-current rotate-45" />
+                        Diamond
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hexagon">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 border-2 border-current" style={{clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)'}} />
+                        Hexagon
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Aspect Ratio</label>
+                <Select value={selectedAspectRatio} onValueChange={(value: AspectRatio) => setSelectedAspectRatio(value)} disabled={isGenerating}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select ratio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1:1">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 border-2 border-current" />
+                        1:1 Square
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="16:9">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-6 border-2 border-current" />
+                        16:9 Wide
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="9:16">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-3 border-2 border-current" />
+                        9:16 Tall
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="4:3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-4 border-2 border-current" />
+                        4:3 Standard
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <Button

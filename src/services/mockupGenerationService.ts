@@ -129,7 +129,9 @@ export class MockupGenerationService {
         uploadedImageId,
         allVariantIds,
         options.title || 'AI Generated Design',
-        2400 // $24.00 in cents
+        2400, // $24.00 in cents
+        'square', // default shape - could be made configurable later
+        '1:1' // default aspect ratio - could be made configurable later
       );
 
       console.log('Product created with ID:', product.id);

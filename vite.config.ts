@@ -46,6 +46,16 @@ export default defineConfig(({ mode }) => {
           target: 'http://localhost:3001',
           changeOrigin: true
         },
+        // Proxy products API calls
+        '/api/products': {
+          target: 'http://localhost:3001',
+          changeOrigin: true
+        },
+        // Proxy Stripe API calls
+        '/api/stripe': {
+          target: 'http://localhost:3001',
+          changeOrigin: true
+        },
       },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

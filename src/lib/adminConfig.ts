@@ -10,6 +10,8 @@ export interface AdminConfig {
   shirtPrice: number; // Price in cents (e.g., 2499 = $24.99)
   blueprintId: number; // Printify blueprint ID for the shirt type
   printProviderId: number; // Printify print provider ID
+  // Featured products configuration
+  featuredProducts: string[]; // Array of product IDs to display on homepage
 }
 
 // Local admin settings (device-specific)
@@ -29,7 +31,9 @@ export const defaultAdminConfig: AdminConfig = {
   // Printify defaults (using values from printifyIntegration.ts)
   shirtPrice: 2499, // $24.99 in cents
   blueprintId: 6, // Standard blueprint ID
-  printProviderId: 103 // Standard print provider ID
+  printProviderId: 103, // Standard print provider ID
+  // Featured products configuration
+  featuredProducts: [] // No featured products by default
 };
 
 // Default local settings

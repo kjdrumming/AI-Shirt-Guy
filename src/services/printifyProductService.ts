@@ -1,3 +1,6 @@
+import { calculatePrintifyPositioning } from '@/lib/printifyPositioning';
+import type { ImageShape, AspectRatio } from '@/lib/utils';
+
 interface PrintifyImage {
   id: string;
   src: string;
@@ -133,7 +136,9 @@ export class PrintifyProductService {
     designImageId: string,
     variantIds: number[],
     title: string = 'Custom Design T-Shirt',
-    price: number = 2400 // $24.00 in cents
+    price: number = 2400, // $24.00 in cents
+    shape: ImageShape = 'square',
+    aspectRatio: AspectRatio = '1:1'
   ): Promise<PrintifyProduct> {
     const productData = {
       title,
@@ -152,13 +157,16 @@ export class PrintifyProductService {
             {
               position: 'front',
               images: [
-                {
-                  id: designImageId,
-                  x: 0.5, // Center horizontally
-                  y: 0.5, // Center vertically
-                  scale: 0.8, // 80% of print area for good margins
-                  angle: 0 // No rotation
-                }
+                (() => {
+                  const positioning = calculatePrintifyPositioning(shape, aspectRatio);
+                  return {
+                    id: designImageId,
+                    x: positioning.x,
+                    y: positioning.y,
+                    scale: positioning.scale,
+                    angle: positioning.angle
+                  };
+                })()
               ]
             }
           ]
@@ -374,7 +382,10 @@ export class PrintifyProductService {
           shopId,
           designImageId,
           color.variantIds,
-          title
+          title,
+          2400, // default price
+          'square', // default shape
+          '1:1' // default aspect ratio
         );
         products[color.name] = product;
         

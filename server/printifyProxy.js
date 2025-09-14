@@ -28,6 +28,8 @@ const stripeRoutes = require('./routes/stripe');
 const printifyMultiOrderRoutes = require('./routes/printifyMultiOrder');
 const adminConfigRoutes = require('./routes/adminConfig');
 const printifyCatalogRoutes = require('./routes/printifyCatalog');
+const printifyProductsRoutes = require('./routes/printifyProducts');
+const printifyUploadsRoutes = require('./routes/printifyUploads');
 
 // Apply security middleware
 app.use(securityHeaders);
@@ -55,6 +57,14 @@ app.use('/api/admin', generalLimiter, adminConfigRoutes);
 // Printify catalog search routes
 app.use('/api/catalog', generalLimiter, printifyCatalogRoutes);
 console.log('✅ Catalog search available at /api/catalog');
+
+// Printify products routes
+app.use('/api/products', generalLimiter, printifyProductsRoutes);
+console.log('✅ Products API available at /api/products');
+
+// Printify uploads routes
+app.use('/api/printify', generalLimiter, printifyUploadsRoutes);
+console.log('✅ Printify uploads API available at /api/printify/uploads');
 
 // Printify multi-order endpoint
 app.use('/api/printify/multi-order', printifyLimiter, printifyMultiOrderRoutes);

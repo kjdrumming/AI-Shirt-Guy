@@ -18,7 +18,9 @@ const defaultAdminConfig = {
   // Printify configuration
   shirtPrice: 2499, // $24.99 in cents
   blueprintId: 6, // Standard blueprint ID
-  printProviderId: 103 // Standard print provider ID
+  printProviderId: 103, // Standard print provider ID
+  // Featured products configuration
+  featuredProducts: [] // Array of product IDs to display on homepage
 };
 
 // Load configuration from file or use defaults
