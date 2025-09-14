@@ -36,6 +36,16 @@ export default defineConfig(({ mode }) => {
             });
           }
         },
+        // Proxy admin config API calls
+        '/api/admin': {
+          target: 'http://localhost:3001',
+          changeOrigin: true
+        },
+        // Proxy catalog search API calls
+        '/api/catalog': {
+          target: 'http://localhost:3001',
+          changeOrigin: true
+        },
       },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

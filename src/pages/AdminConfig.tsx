@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Save, RefreshCw, Lock, Unlock } from "lucide-react";
+import { Settings, Save, RefreshCw, Lock, Unlock, Search, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { 
   getAdminConfig, 
@@ -20,6 +20,20 @@ import {
 interface LocalAdminSettings {
   adminPassword: string;
   printifyApiToken: string;
+}
+
+interface Blueprint {
+  id: number;
+  title: string;
+  brand: string;
+  model: string;
+  images: any[];
+}
+
+interface PrintProvider {
+  id: number;
+  title: string;
+  location?: string;
 }
 
 const AdminConfigPage = () => {
@@ -42,6 +56,15 @@ const AdminConfigPage = () => {
   });
   const [newPromptSuggestion, setNewPromptSuggestion] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Search state for catalog
+  const [blueprintSearchQuery, setBlueprintSearchQuery] = useState("");
+  const [blueprintSearchResults, setBlueprintSearchResults] = useState<Blueprint[]>([]);
+  const [blueprintSearchLoading, setBlueprintSearchLoading] = useState(false);
+  const [providerSearchQuery, setProviderSearchQuery] = useState("");
+  const [providerSearchResults, setProviderSearchResults] = useState<PrintProvider[]>([]);
+  const [providerSearchLoading, setProviderSearchLoading] = useState(false);
+  const [selectedBlueprintForProviders, setSelectedBlueprintForProviders] = useState<number>(6);
 
   // Load config from backend and local settings on component mount
   useEffect(() => {
@@ -130,6 +153,61 @@ const AdminConfigPage = () => {
       printifyApiToken: ""
     });
     toast.success("Configuration reset to defaults");
+  };
+
+  // Search functions
+  const searchBlueprints = async () => {
+    if (!blueprintSearchQuery.trim()) return;
+    
+    setBlueprintSearchLoading(true);
+    try {
+      const response = await fetch(`/api/catalog/blueprints/search?query=${encodeURIComponent(blueprintSearchQuery)}`);
+      if (response.ok) {
+        const results = await response.json();
+        setBlueprintSearchResults(results.blueprints || []);
+      } else {
+        toast.error('Failed to search blueprints');
+      }
+    } catch (error) {
+      console.error('Blueprint search error:', error);
+      toast.error('Failed to search blueprints');
+    }
+    setBlueprintSearchLoading(false);
+  };
+
+  const searchProviders = async () => {
+    if (!providerSearchQuery.trim()) return;
+    
+    setProviderSearchLoading(true);
+    try {
+      const response = await fetch(`/api/catalog/blueprints/${encodeURIComponent(providerSearchQuery)}/providers/search`);
+      if (response.ok) {
+        const results = await response.json();
+        setProviderSearchResults(results.printProviders || []);
+      } else {
+        toast.error('Failed to search print providers');
+      }
+    } catch (error) {
+      console.error('Provider search error:', error);
+      toast.error('Failed to search print providers');
+    }
+    setProviderSearchLoading(false);
+  };
+
+  const useBlueprint = (blueprint: Blueprint) => {
+    setGlobalConfig(prev => ({
+      ...prev,
+      blueprintId: blueprint.id
+    }));
+    toast.success(`Using blueprint: ${blueprint.title}`);
+  };
+
+  const useProvider = (provider: PrintProvider) => {
+    setGlobalConfig(prev => ({
+      ...prev,
+      printProviderId: provider.id
+    }));
+    toast.success(`Using print provider: ${provider.title}`);
   };
 
   if (!isAuthenticated) {
@@ -424,6 +502,113 @@ const AdminConfigPage = () => {
                 }))}
                 placeholder="Set admin password"
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Catalog Search */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Catalog Search
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Search Printify catalog for blueprints and print providers
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Blueprint Search */}
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Search Blueprints</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Search by title or brand (e.g., 'Unisex', 'Bella')"
+                  value={blueprintSearchQuery}
+                  onChange={(e) => setBlueprintSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchBlueprints()}
+                />
+                <Button 
+                  onClick={searchBlueprints} 
+                  disabled={blueprintSearchLoading || !blueprintSearchQuery.trim()}
+                >
+                  {blueprintSearchLoading ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              
+              {blueprintSearchResults.length > 0 && (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {blueprintSearchResults.map((blueprint: Blueprint) => (
+                    <div key={blueprint.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium">{blueprint.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          ID: {blueprint.id} | Brand: {blueprint.brand}
+                        </p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => useBlueprint(blueprint)}
+                        className="ml-2"
+                      >
+                        Use This
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Separator */}
+            <div className="border-t pt-6">
+              {/* Print Provider Search */}
+              <div className="space-y-3">
+                <Label className="text-base font-medium">Search Print Providers</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter Blueprint ID (e.g., '6')"
+                    value={providerSearchQuery}
+                    onChange={(e) => setProviderSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && searchProviders()}
+                  />
+                  <Button 
+                    onClick={searchProviders} 
+                    disabled={providerSearchLoading || !providerSearchQuery.trim()}
+                  >
+                    {providerSearchLoading ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                
+                {providerSearchResults.length > 0 && (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {providerSearchResults.map((provider: PrintProvider) => (
+                      <div key={provider.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium">{provider.title}</p>
+                          <p className="text-sm text-muted-foreground">
+                            ID: {provider.id} | Location: {provider.location || 'N/A'}
+                          </p>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          onClick={() => useProvider(provider)}
+                          className="ml-2"
+                        >
+                          Use This
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

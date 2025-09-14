@@ -27,6 +27,7 @@ const { generalLimiter, stripePaymentLimiter, printifyLimiter, securityHeaders }
 const stripeRoutes = require('./routes/stripe');
 const printifyMultiOrderRoutes = require('./routes/printifyMultiOrder');
 const adminConfigRoutes = require('./routes/adminConfig');
+const printifyCatalogRoutes = require('./routes/printifyCatalog');
 
 // Apply security middleware
 app.use(securityHeaders);
@@ -50,6 +51,10 @@ app.use('/api/stripe', stripePaymentLimiter, stripeRoutes);
 
 // Admin configuration routes
 app.use('/api/admin', generalLimiter, adminConfigRoutes);
+
+// Printify catalog search routes
+app.use('/api/catalog', generalLimiter, printifyCatalogRoutes);
+console.log('✅ Catalog search available at /api/catalog');
 
 // Printify multi-order endpoint
 app.use('/api/printify/multi-order', printifyLimiter, printifyMultiOrderRoutes);
