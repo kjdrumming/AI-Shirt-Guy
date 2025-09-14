@@ -17,7 +17,7 @@ import { generateImages, cleanupImageUrls, type GeneratedImage } from "@/service
 import { generateStockImages, cleanupStockImages, type StockImage } from "@/services/stockImages";
 import { pollinationsService, cleanupPollinationsImages, type PollinationsImage } from "@/services/pollinations";
 import { printifyIntegration, type PrintifyProduct } from "../services/printifyIntegration";
-import { getCurrentImageSource, isDebugModeEnabled, getMaxDesignsPerGeneration, isMultiShirtSelectionEnabled, isMaintenanceModeEnabled } from "@/lib/adminConfig";
+import { getCurrentImageSource, getCurrentImageSourceAsync, isDebugModeEnabled, getMaxDesignsPerGeneration, isMultiShirtSelectionEnabled, isMaintenanceModeEnabled } from "@/lib/adminConfig";
 
 interface Design {
   id: string;
@@ -63,6 +63,7 @@ const Index = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [isLoadingVariants, setIsLoadingVariants] = useState(false);
+  const [isConfigInitialized, setIsConfigInitialized] = useState(false);
   const [designs, setDesigns] = useState<(Design | StockImage | PollinationsImage)[]>([]);
   const [selectedDesign, setSelectedDesign] = useState<Design | StockImage | null>(null);
   // Multi-shirt selection state
@@ -100,6 +101,24 @@ const Index = () => {
       }
     };
   }, [designs]);
+
+  // Initialize global configuration on component mount
+  useEffect(() => {
+    const initializeConfig = async () => {
+      try {
+        // Wait for global config to be available
+        const imageSource = await getCurrentImageSourceAsync();
+        console.log('🚀 Index component initialized with image source:', imageSource);
+        setIsConfigInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize config in Index component:', error);
+        // Still proceed to prevent blocking the app
+        setIsConfigInitialized(true);
+      }
+    };
+
+    initializeConfig();
+  }, []);
 
   // Download function for images
   const handleDownloadImage = async (imageUrl: string, title: string) => {
@@ -479,6 +498,24 @@ const Index = () => {
   };
 
   return (
+    <>
+      {/* Show loading screen while config is being initialized */}
+      {!isConfigInitialized && (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+          <div className="text-center max-w-md">
+            <div className="mx-auto w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mb-6">
+              <Loader2 className="h-8 w-8 text-white animate-spin" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Loading AI Shirt Guy</h1>
+            <p className="text-gray-600 mb-6">
+              Initializing your personalized design experience...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Main app content - only show when config is initialized */}
+      {isConfigInitialized && (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
       <div className="bg-background/80 backdrop-blur-sm border-b sticky top-0 z-50">
@@ -1067,6 +1104,8 @@ const Index = () => {
         </div>
       </div>
     </div>
+      )}
+    </>
   );
 };
 

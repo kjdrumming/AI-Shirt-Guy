@@ -41,21 +41,24 @@ export const fetchGlobalAdminConfig = async (): Promise<AdminConfig> => {
     // Use cache if recent
     const now = Date.now();
     if (globalConfigCache && (now - lastFetchTime) < CACHE_DURATION) {
+      console.log('🔄 Using cached admin config:', globalConfigCache);
       return globalConfigCache;
     }
 
+    console.log('🌐 Fetching global admin config from backend...');
     const response = await fetch('/api/admin/config');
     if (!response.ok) {
-      throw new Error('Failed to fetch global config');
+      throw new Error(`Failed to fetch global config: ${response.status}`);
     }
     
     const config = await response.json();
     globalConfigCache = { ...defaultAdminConfig, ...config };
     lastFetchTime = now;
     
+    console.log('✅ Global admin config loaded:', globalConfigCache);
     return globalConfigCache;
   } catch (error) {
-    console.error('Failed to fetch global admin config:', error);
+    console.error('❌ Failed to fetch global admin config:', error);
     return globalConfigCache || defaultAdminConfig;
   }
 };
@@ -121,7 +124,9 @@ export const updateGlobalAdminConfig = async (config: Partial<AdminConfig>, pass
 
 // Get current image source from cached global config (synchronous)
 export const getCurrentImageSource = (): "stock" | "huggingface" | "pollinations" => {
-  return globalConfigCache?.imageSource || defaultAdminConfig.imageSource;
+  const imageSource = globalConfigCache?.imageSource || defaultAdminConfig.imageSource;
+  console.log('🎯 getCurrentImageSource called - returning:', imageSource, 'cache:', !!globalConfigCache);
+  return imageSource;
 };
 
 // Get current image source from global admin config (async - use for guaranteed fresh data)

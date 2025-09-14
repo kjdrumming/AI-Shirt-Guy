@@ -15,6 +15,8 @@ let globalAdminConfig = {
 // Get global admin configuration (public endpoint)
 router.get('/config', (req, res) => {
   try {
+    console.log('📋 Admin config requested, returning:', globalAdminConfig);
+    
     // Return config without sensitive data
     const publicConfig = {
       imageSource: globalAdminConfig.imageSource,

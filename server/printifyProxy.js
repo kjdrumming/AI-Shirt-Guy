@@ -35,7 +35,7 @@ app.use(generalLimiter);
 // CORS configuration for production
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] // Replace with your actual domain
+    ? ['https://ai-shirt-guy-kjdrummings-projects.vercel.app', 'https://ai-shirt-guy.vercel.app'] // Add your Vercel domains
     : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:8081', 'http://127.0.0.1:8081', 'http://localhost:8082', 'http://127.0.0.1:8082'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
