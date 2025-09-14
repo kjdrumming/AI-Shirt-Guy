@@ -26,12 +26,15 @@ const AdminConfigPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [globalConfig, setGlobalConfig] = useState<AdminConfig>({
-    imageSource: "stock",
+    imageSource: "pollinations",
     debugMode: false,
     maxDesignsPerGeneration: 3,
     enableMultiShirtSelection: true,
     customPromptSuggestions: [],
-    maintenanceMode: false
+    maintenanceMode: false,
+    shirtPrice: 2499,
+    blueprintId: 6,
+    printProviderId: 103
   });
   const [localSettings, setLocalSettings] = useState<LocalAdminSettings>({
     adminPassword: "admin123",
@@ -112,12 +115,15 @@ const AdminConfigPage = () => {
   // Reset to defaults
   const resetToDefaults = () => {
     setGlobalConfig({
-      imageSource: "stock",
+      imageSource: "pollinations",
       debugMode: false,
       maxDesignsPerGeneration: 3,
       enableMultiShirtSelection: true,
       customPromptSuggestions: [],
-      maintenanceMode: false
+      maintenanceMode: false,
+      shirtPrice: 2499,
+      blueprintId: 6,
+      printProviderId: 103
     });
     setLocalSettings({
       adminPassword: "admin123",
@@ -282,6 +288,69 @@ const AdminConfigPage = () => {
                   setGlobalConfig(prev => ({ ...prev, maintenanceMode: checked }))
                 }
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Printify Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Printify Configuration</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Configure shirt pricing and Printify product settings
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="shirtPrice">Shirt Price (in cents)</Label>
+              <Input
+                id="shirtPrice"
+                type="number"
+                min="100"
+                max="100000"
+                value={globalConfig.shirtPrice}
+                onChange={(e) => setGlobalConfig(prev => ({ 
+                  ...prev, 
+                  shirtPrice: parseInt(e.target.value) || 2499 
+                }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Price in cents (e.g., 2499 = $24.99)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="blueprintId">Blueprint ID</Label>
+              <Input
+                id="blueprintId"
+                type="number"
+                min="1"
+                value={globalConfig.blueprintId}
+                onChange={(e) => setGlobalConfig(prev => ({ 
+                  ...prev, 
+                  blueprintId: parseInt(e.target.value) || 6 
+                }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Printify blueprint ID for the shirt type (e.g., 6 for standard t-shirt)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="printProviderId">Print Provider ID</Label>
+              <Input
+                id="printProviderId"
+                type="number"
+                min="1"
+                value={globalConfig.printProviderId}
+                onChange={(e) => setGlobalConfig(prev => ({ 
+                  ...prev, 
+                  printProviderId: parseInt(e.target.value) || 103 
+                }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Printify print provider ID (e.g., 103 for standard provider)
+              </p>
             </div>
           </CardContent>
         </Card>

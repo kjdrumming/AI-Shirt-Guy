@@ -1,4 +1,6 @@
 // Simplified Printify integration for the core flow
+import { getShirtPrice, getBlueprintId, getPrintProviderId } from "@/lib/adminConfig";
+
 export interface PrintifyVariant {
   id: number;
   title: string;
@@ -53,7 +55,9 @@ class PrintifyIntegrationService {
   // Step 1: Get available variants for a blueprint
   async getBlueprint6Variants(): Promise<PrintifyVariant[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/catalog/blueprints/6/print_providers/103/variants.json`);
+      const blueprintId = getBlueprintId();
+      const printProviderId = getPrintProviderId();
+      const response = await fetch(`${this.baseUrl}/catalog/blueprints/${blueprintId}/print_providers/${printProviderId}/variants.json`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch variants: ${response.status}`);
@@ -230,12 +234,12 @@ class PrintifyIntegrationService {
       const productData = {
         title,
         description,
-        blueprint_id: 6,
-        print_provider_id: 103,
+        blueprint_id: getBlueprintId(),
+        print_provider_id: getPrintProviderId(),
         variants: [
           {
             id: variantIdInt,
-            price: 2499, // $24.99 in cents
+            price: getShirtPrice(), // Use configurable price
             is_enabled: true
           }
         ],

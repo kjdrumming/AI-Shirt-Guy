@@ -9,7 +9,11 @@ let globalAdminConfig = {
   maxDesignsPerGeneration: 3,
   enableMultiShirtSelection: true,
   customPromptSuggestions: [],
-  maintenanceMode: false
+  maintenanceMode: false,
+  // Printify configuration
+  shirtPrice: 2499, // $24.99 in cents
+  blueprintId: 6, // Standard blueprint ID
+  printProviderId: 103 // Standard print provider ID
 };
 
 // Get global admin configuration (public endpoint)
@@ -24,7 +28,10 @@ router.get('/config', (req, res) => {
       maxDesignsPerGeneration: globalAdminConfig.maxDesignsPerGeneration,
       enableMultiShirtSelection: globalAdminConfig.enableMultiShirtSelection,
       customPromptSuggestions: globalAdminConfig.customPromptSuggestions,
-      maintenanceMode: globalAdminConfig.maintenanceMode
+      maintenanceMode: globalAdminConfig.maintenanceMode,
+      shirtPrice: globalAdminConfig.shirtPrice,
+      blueprintId: globalAdminConfig.blueprintId,
+      printProviderId: globalAdminConfig.printProviderId
     };
     
     res.json(publicConfig);

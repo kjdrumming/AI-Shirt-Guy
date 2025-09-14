@@ -1,5 +1,6 @@
 import { printifyProductService } from './printifyProductService';
 import { printifyCatalogService } from './printifyCatalog';
+import { getBlueprintId, getPrintProviderId } from "@/lib/adminConfig";
 
 interface MockupGenerationOptions {
   designFile?: File;
@@ -37,8 +38,7 @@ interface MockupGenerationResult {
 
 export class MockupGenerationService {
   private static readonly SHOP_ID = '24294177'; // AI-Shirt-Guy shop
-  private static readonly BLUEPRINT_ID = 676; // Unisex Hammer™ T-shirt
-  private static readonly PRINT_PROVIDER_ID = 74; // Ink Blot
+  // Blueprint and Print Provider IDs are now configurable via admin settings
 
   /**
    * Generate blank shirt templates without any models - perfect for custom mockup backgrounds

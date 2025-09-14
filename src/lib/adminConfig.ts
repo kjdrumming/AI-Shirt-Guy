@@ -6,6 +6,10 @@ export interface AdminConfig {
   enableMultiShirtSelection: boolean;
   customPromptSuggestions: string[];
   maintenanceMode: boolean;
+  // Printify configuration
+  shirtPrice: number; // Price in cents (e.g., 2499 = $24.99)
+  blueprintId: number; // Printify blueprint ID for the shirt type
+  printProviderId: number; // Printify print provider ID
 }
 
 // Local admin settings (device-specific)
@@ -21,7 +25,11 @@ export const defaultAdminConfig: AdminConfig = {
   maxDesignsPerGeneration: 3,
   enableMultiShirtSelection: true,
   customPromptSuggestions: [],
-  maintenanceMode: false
+  maintenanceMode: false,
+  // Printify defaults (using values from printifyIntegration.ts)
+  shirtPrice: 2499, // $24.99 in cents
+  blueprintId: 6, // Standard blueprint ID
+  printProviderId: 103 // Standard print provider ID
 };
 
 // Default local settings
@@ -188,6 +196,39 @@ export const getCustomPromptSuggestions = (): string[] => {
 export const getCustomPromptSuggestionsAsync = async (): Promise<string[]> => {
   const config = await getAdminConfig();
   return config.customPromptSuggestions;
+};
+
+// Get shirt price (synchronous)
+export const getShirtPrice = (): number => {
+  return globalConfigCache?.shirtPrice || defaultAdminConfig.shirtPrice;
+};
+
+// Get shirt price (async)
+export const getShirtPriceAsync = async (): Promise<number> => {
+  const config = await getAdminConfig();
+  return config.shirtPrice;
+};
+
+// Get blueprint ID (synchronous)
+export const getBlueprintId = (): number => {
+  return globalConfigCache?.blueprintId || defaultAdminConfig.blueprintId;
+};
+
+// Get blueprint ID (async)
+export const getBlueprintIdAsync = async (): Promise<number> => {
+  const config = await getAdminConfig();
+  return config.blueprintId;
+};
+
+// Get print provider ID (synchronous)
+export const getPrintProviderId = (): number => {
+  return globalConfigCache?.printProviderId || defaultAdminConfig.printProviderId;
+};
+
+// Get print provider ID (async)
+export const getPrintProviderIdAsync = async (): Promise<number> => {
+  const config = await getAdminConfig();
+  return config.printProviderId;
 };
 
 // Get Printify API token from local settings
