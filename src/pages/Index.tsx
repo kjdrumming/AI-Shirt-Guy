@@ -17,7 +17,7 @@ import { generateImages, cleanupImageUrls, type GeneratedImage } from "@/service
 import { generateStockImages, cleanupStockImages, type StockImage } from "@/services/stockImages";
 import { pollinationsService, cleanupPollinationsImages, type PollinationsImage } from "@/services/pollinations";
 import { printifyIntegration, type PrintifyProduct } from "../services/printifyIntegration";
-import { getCurrentImageSource, getCurrentImageSourceAsync, isDebugModeEnabled, getMaxDesignsPerGeneration, isMultiShirtSelectionEnabled, isMaintenanceModeEnabled } from "@/lib/adminConfig";
+import { getCurrentImageSource, getCurrentImageSourceAsync, isDebugModeEnabled, getMaxDesignsPerGeneration, isMultiShirtSelectionEnabled, isMaintenanceModeEnabled, getShirtPrice } from "@/lib/adminConfig";
 
 interface Design {
   id: string;
@@ -851,7 +851,7 @@ const Index = () => {
                         <div className="text-center space-y-2">
                           <h4 className="font-medium">{shirt.design.title}</h4>
                           <p className="text-sm text-muted-foreground">
-                            {shirt.color} • {shirt.size} • $24.99
+                            {shirt.color} • {shirt.size} • ${(getShirtPrice() / 100).toFixed(2)}
                           </p>
                         </div>
                         
@@ -948,7 +948,7 @@ const Index = () => {
                   </div>                  <div className="border-t pt-4">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Total:</span>
-                      <span className="font-bold text-lg">${(selectedShirts.length * 24.99).toFixed(2)}</span>
+                      <span className="font-bold text-lg">${(selectedShirts.length * (getShirtPrice() / 100)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -962,7 +962,7 @@ const Index = () => {
                     onClick={handleProceedToPayment}
                   >
                     <Shirt className="mr-2 h-4 w-4" />
-                    Pay & Order Now - ${(selectedShirts.length * 24.99).toFixed(2)}
+                    Pay & Order Now - ${(selectedShirts.length * (getShirtPrice() / 100)).toFixed(2)}
                   </Button>
                   
                   {/* Development/Testing Button */}
@@ -1008,7 +1008,7 @@ const Index = () => {
         {currentStep === "stripe" && selectedShirts.length > 0 && (
           <div className="max-w-2xl mx-auto">
             <StripeCheckout
-              amount={selectedShirts.length * 24.99}
+              amount={selectedShirts.length * (getShirtPrice() / 100)}
               productTitle={`${selectedShirts.length} Custom Shirt${selectedShirts.length > 1 ? 's' : ''}`}
               productDescription={selectedShirts.map(s => `${s.design.title} (${s.color} ${s.size})`).join(', ')}
               onPaymentSuccess={handlePaymentSuccess}

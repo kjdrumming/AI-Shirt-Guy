@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShirtMockup } from "@/components/ShirtMockup";
+import { Check, Shirt } from "lucide-react";
+import { getShirtPrice } from "@/lib/adminConfig";
 
 interface ShirtTemplate {
   id: string;
@@ -31,7 +32,7 @@ export function ShirtTemplates({ onSelectTemplate, selectedTemplate, selectedDes
   const template: ShirtTemplate = {
     id: "gildan-heavy-cotton",
     name: "Unisex Heavy Cotton Tee (Gildan)",
-    price: 24.99,
+    price: getShirtPrice() / 100, // Convert from cents to dollars
     colors: ["White", "Black", "Navy", "Gray", "Red", "Royal Blue", "Forest Green"],
     sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"]
   };
