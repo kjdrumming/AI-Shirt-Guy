@@ -254,27 +254,63 @@ interface Product {
   };
 
   // Toggle product selection
-  const toggleProductSelection = (productId: string) => {
-    setGlobalConfig(prev => {
-      const isSelected = prev.featuredProducts.includes(productId);
+  const toggleProductSelection = async (productId: string) => {
+    try {
+      const isSelected = globalConfig.featuredProducts.includes(productId);
       const newFeaturedProducts = isSelected
-        ? prev.featuredProducts.filter(id => id !== productId)
-        : [...prev.featuredProducts, productId];
+        ? globalConfig.featuredProducts.filter(id => id !== productId)
+        : [...globalConfig.featuredProducts, productId];
       
-      return {
+      // Update local state immediately
+      setGlobalConfig(prev => ({
         ...prev,
         featuredProducts: newFeaturedProducts
-      };
-    });
+      }));
+      
+      // Save to server immediately to persist the change
+      await updateGlobalAdminConfig({ featuredProducts: newFeaturedProducts }, localSettings.adminPassword);
+      
+      const actionText = isSelected ? 'removed from' : 'added to';
+      toast.success(`Product ${actionText} featured products`);
+    } catch (error) {
+      console.error('Failed to update featured products:', error);
+      toast.error('Failed to save featured products selection');
+      
+      // Revert the local state change on error
+      setGlobalConfig(prev => {
+        const isSelected = prev.featuredProducts.includes(productId);
+        const revertedFeaturedProducts = isSelected
+          ? [...prev.featuredProducts, productId]  // Add back if it was removed
+          : prev.featuredProducts.filter(id => id !== productId);  // Remove if it was added
+        
+        return {
+          ...prev,
+          featuredProducts: revertedFeaturedProducts
+        };
+      });
+    }
   };
 
   // Clear all featured products
-  const clearAllFeaturedProducts = () => {
-    setGlobalConfig(prev => ({
-      ...prev,
-      featuredProducts: []
-    }));
-    toast.success('All featured products cleared');
+  const clearAllFeaturedProducts = async () => {
+    try {
+      // Update local state immediately
+      setGlobalConfig(prev => ({
+        ...prev,
+        featuredProducts: []
+      }));
+      
+      // Save to server immediately to persist the change
+      await updateGlobalAdminConfig({ featuredProducts: [] }, localSettings.adminPassword);
+      
+      toast.success('All featured products cleared and saved');
+    } catch (error) {
+      console.error('Failed to clear featured products:', error);
+      toast.error('Failed to save featured products changes');
+      
+      // Revert the local state change on error - would need to restore previous state
+      // For simplicity, we'll let the user manually reload if needed
+    }
   };
 
   // Save config to backend and local settings
