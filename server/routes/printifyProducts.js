@@ -369,7 +369,7 @@ router.get('/all-products', async (req, res) => {
 });
 
 /**
- * Get manually selected featured products from AI-Shirt-Guy shop
+ * Get all products from AI-Shirt-Guy shop in random order
  */
 router.get('/top-products', async (req, res) => {
   try {
@@ -380,35 +380,17 @@ router.get('/top-products', async (req, res) => {
       return res.status(500).json({ error: 'Printify API token not configured' });
     }
 
-    // Load admin config to get featured product IDs
-    const adminConfig = loadAdminConfig();
-    const featuredProductIds = adminConfig.featuredProducts || [];
-    
-    console.log(`🛍️ Fetching featured products from AI-Shirt-Guy shop ${shopId}...`);
-    console.log(`📋 Featured product IDs from admin: [${featuredProductIds.join(', ')}]`);
+    console.log(`🛍️ Fetching ALL products from AI-Shirt-Guy shop ${shopId} in random order...`);
 
-    // If no featured products are selected, return empty result
-    if (featuredProductIds.length === 0) {
-      console.log('� No featured products selected in admin config');
-      const result = {
-        data: [],
-        total: 0,
-        shop_id: shopId,
-        shop_name: "AI-Shirt-Guy",
-        message: "No featured products selected. Please configure featured products in the admin panel."
-      };
-      return res.json(result);
-    }
-
-    // Check cache first
-    const cacheKey = `featured-products-${shopId}-${featuredProductIds.join('-')}`;
+    // Check cache first (cache for 5 minutes since we want some variety but not constant API calls)
+    const cacheKey = `all-products-${shopId}-${Math.floor(Date.now() / 300000)}`; // 5-min cache buckets
     const cachedProducts = cache.get(cacheKey);
     if (cachedProducts) {
-      console.log(`� Cache HIT for featured products (shop: ${shopId})`);
+      console.log(`📋 Cache HIT for all products (shop: ${shopId})`);
       return res.json(cachedProducts);
     }
 
-    // Fetch all products to filter the featured ones
+    // Fetch all products
     const response = await fetch(`https://api.printify.com/v1/shops/${shopId}/products.json?limit=50`, {
       method: 'GET',
       headers: {
@@ -443,46 +425,40 @@ router.get('/top-products', async (req, res) => {
     
     console.log(`📦 Found ${allProducts.length} total products in AI-Shirt-Guy shop ${shopId}`);
     
-    // Filter for featured products and maintain the order from admin config
-    const featuredProducts = [];
-    for (const productId of featuredProductIds) {
-      const product = allProducts.find(p => p.id === productId);
-      if (product && product.visible === true) {
-        featuredProducts.push({
-          id: product.id,
-          title: product.title,
-          description: product.description,
-          created_at: product.created_at,
-          visible: product.visible,
-          // Get the first default image or first available image
-          image: product.images?.find(img => img.is_default) || product.images?.[0] || null,
-          // Get price from first enabled variant
-          price: product.variants?.find(variant => variant.is_enabled)?.price || null,
-          // Include variant info for pricing display
-          variants: product.variants?.filter(variant => variant.is_enabled).map(variant => ({
-            id: variant.id,
-            title: variant.title,
-            price: variant.price,
-            is_default: variant.is_default
-          })) || []
-        });
-      } else if (product) {
-        console.log(`⚠️ Product ${productId} found but not published/visible`);
-      } else {
-        console.log(`⚠️ Product ${productId} not found in shop`);
-      }
-    }
+    // Filter for visible products and format them
+    const visibleProducts = allProducts
+      .filter(product => product.visible === true)
+      .map(product => ({
+        id: product.id,
+        title: product.title,
+        description: product.description,
+        created_at: product.created_at,
+        visible: product.visible,
+        // Get the first default image or first available image
+        image: product.images?.find(img => img.is_default) || product.images?.[0] || null,
+        // Get price from first enabled variant
+        price: product.variants?.find(variant => variant.is_enabled)?.price || null,
+        // Include variant info for pricing display
+        variants: product.variants?.filter(variant => variant.is_enabled).map(variant => ({
+          id: variant.id,
+          title: variant.title,
+          price: variant.price,
+          is_default: variant.is_default
+        })) || []
+      }));
+
+    // Shuffle products to display in random order
+    const shuffledProducts = visibleProducts.sort(() => Math.random() - 0.5);
     
-    console.log(`✅ Found ${featuredProducts.length} featured products from AI-Shirt-Guy shop`);
+    console.log(`✅ Returning ${shuffledProducts.length} products in random order from AI-Shirt-Guy shop`);
     
     const result = {
-      data: featuredProducts,
-      total: featuredProducts.length,
+      data: shuffledProducts,
+      total: shuffledProducts.length,
       shop_id: shopId,
       shop_name: "AI-Shirt-Guy",
-      featured_product_ids: featuredProductIds,
-      found_products: featuredProducts.length,
-      total_configured: featuredProductIds.length
+      display_mode: "all_products_random",
+      last_shuffled: new Date().toISOString()
     };
     
     // Cache the result for 5 minutes
@@ -491,7 +467,7 @@ router.get('/top-products', async (req, res) => {
     res.json(result);
 
   } catch (error) {
-    console.error('❌ Error fetching featured products:', error);
+    console.error('❌ Error fetching all products:', error);
     res.status(500).json({ 
       error: 'Internal server error while fetching products',
       details: error.message 

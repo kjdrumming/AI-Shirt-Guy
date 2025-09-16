@@ -1157,16 +1157,16 @@ interface Product {
             </Card>
           </TabsContent>
 
-          {/* Featured Products Management Tab */}
+          {/* Product Display Management Tab */}
           <TabsContent value="products" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Star className="h-5 w-5" />
-                  Featured Products Management
+                  Product Display Management
                 </CardTitle>
                 <CardDescription>
-                  Select which products to feature on the homepage. Products will appear in the order selected.
+                  Note: Homepage now shows ALL products in random order. The featured products system has been replaced with a random display of all visible products for better variety.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -1201,7 +1201,7 @@ interface Product {
                     <>
                       <div className="flex items-center justify-between">
                         <Label className="text-base font-medium">
-                          Select Products to Feature ({globalConfig.featuredProducts?.length || 0}/5 selected)
+                          Products Available ({globalConfig.featuredProducts?.length || 0} previously selected - now showing ALL in random order)
                         </Label>
                         <Button 
                           onClick={clearAllFeaturedProducts}
@@ -1227,10 +1227,6 @@ interface Product {
                               <Checkbox
                                 checked={globalConfig.featuredProducts?.includes(product.id) || false}
                                 onCheckedChange={() => toggleProductSelection(product.id)}
-                                disabled={
-                                  !globalConfig.featuredProducts?.includes(product.id) && 
-                                  (globalConfig.featuredProducts?.length || 0) >= 5
-                                }
                               />
                             </div>
                             
