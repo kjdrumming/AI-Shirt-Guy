@@ -83,7 +83,8 @@ router.get('/config', (req, res) => {
       maintenanceMode: globalAdminConfig.maintenanceMode,
       shirtPrice: globalAdminConfig.shirtPrice,
       blueprintId: globalAdminConfig.blueprintId,
-      printProviderId: globalAdminConfig.printProviderId
+      printProviderId: globalAdminConfig.printProviderId,
+      featuredProducts: globalAdminConfig.featuredProducts || []
     };
     
     res.json(publicConfig);
