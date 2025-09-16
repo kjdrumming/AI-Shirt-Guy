@@ -716,34 +716,50 @@ interface Product {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center">
               <Settings className="h-5 w-5 text-white" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">Admin Configuration</h1>
+            <div className="text-center sm:text-left">
+              <h1 className="text-xl sm:text-2xl font-bold">Admin Configuration</h1>
               <p className="text-sm text-muted-foreground">
                 Manage application settings and preferences
               </p>
             </div>
           </div>
-          <Button onClick={() => setIsAuthenticated(false)} variant="outline">
+          <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="w-full sm:w-auto">
             Logout
           </Button>
         </div>
 
         {/* Tabs Interface */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-8">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="features">Features</TabsTrigger>
-            <TabsTrigger value="printify">Printify</TabsTrigger>
-            <TabsTrigger value="prompts">Prompts</TabsTrigger>
-            <TabsTrigger value="api">API</TabsTrigger>
-            <TabsTrigger value="catalog">Catalog</TabsTrigger>
-            <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="create">Create</TabsTrigger>
+          <TabsList className="h-auto min-h-[2.5rem] w-full justify-start overflow-x-auto flex-nowrap gap-1 p-1">
+            <TabsTrigger value="general" className="text-xs whitespace-nowrap flex-shrink-0">
+              General
+            </TabsTrigger>
+            <TabsTrigger value="features" className="text-xs whitespace-nowrap flex-shrink-0">
+              Features
+            </TabsTrigger>
+            <TabsTrigger value="printify" className="text-xs whitespace-nowrap flex-shrink-0">
+              Printify
+            </TabsTrigger>
+            <TabsTrigger value="prompts" className="text-xs whitespace-nowrap flex-shrink-0">
+              Prompts
+            </TabsTrigger>
+            <TabsTrigger value="api" className="text-xs whitespace-nowrap flex-shrink-0">
+              API
+            </TabsTrigger>
+            <TabsTrigger value="catalog" className="text-xs whitespace-nowrap flex-shrink-0">
+              Catalog
+            </TabsTrigger>
+            <TabsTrigger value="products" className="text-xs whitespace-nowrap flex-shrink-0">
+              Products
+            </TabsTrigger>
+            <TabsTrigger value="create" className="text-xs whitespace-nowrap flex-shrink-0">
+              Create
+            </TabsTrigger>
           </TabsList>
 
           {/* General Settings Tab */}
