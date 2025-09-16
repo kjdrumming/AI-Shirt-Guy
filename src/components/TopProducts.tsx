@@ -166,7 +166,7 @@ export function TopProducts() {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product) => (
             <Card key={product.id} className="group hover:shadow-lg transition-shadow duration-200">
               <div className="relative overflow-hidden rounded-t-lg">
@@ -174,15 +174,15 @@ export function TopProducts() {
                   <img
                     src={product.image.src}
                     alt={product.title}
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
+                    className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-200"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
                     }}
                   />
                 ) : (
-                  <div className="w-full h-48 bg-muted flex items-center justify-center">
-                    <ShoppingBag className="h-12 w-12 text-muted-foreground" />
+                  <div className="w-full h-64 bg-muted flex items-center justify-center">
+                    <ShoppingBag className="h-16 w-16 text-muted-foreground" />
                   </div>
                 )}
                 
@@ -193,32 +193,32 @@ export function TopProducts() {
                 )}
               </div>
               
-              <CardContent className="p-4">
-                <h3 className="font-semibold text-sm line-clamp-2 mb-2 min-h-[2.5rem]">
+              <CardContent className="p-5">
+                <h3 className="font-semibold text-base line-clamp-2 mb-3 min-h-[3rem]">
                   {product.title}
                 </h3>
                 
                 {product.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                  <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
                     {cleanProductDescription(product.description)}
                   </p>
                 )}
                 
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-4">
                   {product.variants.length > 1 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-sm">
                       {product.variants.length} variants
                     </Badge>
                   )}
                 </div>
                 
                 <Button
-                  size="sm"
+                  size="default"
                   variant="outline"
-                  className="w-full gap-2 text-xs"
+                  className="w-full gap-2"
                   onClick={() => handleSelectSizeColor(product)}
                 >
-                  <Palette className="h-3 w-3" />
+                  <Palette className="h-4 w-4" />
                   Select Size & Color
                 </Button>
               </CardContent>
@@ -226,15 +226,10 @@ export function TopProducts() {
           ))}
         </div>
         
-        {products.length === 5 && (
-          <div className="text-center mt-6">
+        {products.length > 0 && (
+          <div className="text-center mt-8">
             <p className="text-sm text-muted-foreground">
-              Showing top 5 products • 
-              <Button variant="link" className="p-0 ml-1 text-sm" asChild>
-                <a href="#" onClick={() => toast.info('Full catalog coming soon!')}>
-                  View all products
-                </a>
-              </Button>
+              Showing {products.length} product{products.length !== 1 ? 's' : ''} in random order • Products refresh every few minutes
             </p>
           </div>
         )}
