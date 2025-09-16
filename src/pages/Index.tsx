@@ -793,8 +793,24 @@ const Index = () => {
               </div>
             </div>
             
-            {/* Start Over Button */}
-            <div className="flex items-center">
+            {/* Shirt Shop Button and Start Over Button */}
+            <div className="flex items-center gap-3">
+              {currentStep === "prompt" && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    const productsSection = document.getElementById('shirt-shop');
+                    if (productsSection) {
+                      productsSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  <Shirt className="h-4 w-4" />
+                  Shirt Shop
+                </Button>
+              )}
               {currentStep !== "prompt" && currentStep !== "success" && (
                 <Button variant="ghost" onClick={resetApp}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
@@ -853,7 +869,9 @@ const Index = () => {
             />
             
             {/* Top Products Section */}
-            <TopProducts />
+            <div id="shirt-shop">
+              <TopProducts />
+            </div>
           </div>
         )}
 
