@@ -95,7 +95,7 @@ interface Product {
   const [productSearchQuery, setProductSearchQuery] = useState("");
 
   // Tab state
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("create");
 
   // Admin AI shirt creation state (matching main UI)
   const [designs, setDesigns] = useState<any[]>([]);
