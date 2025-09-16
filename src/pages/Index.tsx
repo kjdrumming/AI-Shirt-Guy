@@ -793,24 +793,8 @@ const Index = () => {
               </div>
             </div>
             
-            {/* Shirt Shop Button and Start Over Button */}
-            <div className="flex items-center gap-3">
-              {currentStep === "prompt" && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    const productsSection = document.getElementById('shirt-shop');
-                    if (productsSection) {
-                      productsSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                  className="gap-2"
-                >
-                  <Shirt className="h-4 w-4" />
-                  Shirt Shop
-                </Button>
-              )}
+            {/* Start Over Button */}
+            <div className="flex items-center">
               {currentStep !== "prompt" && currentStep !== "success" && (
                 <Button variant="ghost" onClick={resetApp}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
@@ -856,6 +840,39 @@ const Index = () => {
           <div className="text-center mt-4">
             <h2 className="text-2xl font-bold">{stepTitles[currentStep]}</h2>
           </div>
+          
+          {/* Or divider and Shirt Shop button right under the heading */}
+          {currentStep === "prompt" && (
+            <div className="space-y-4">
+              {/* Or divider */}
+              <div className="relative flex items-center justify-center py-4 mt-6">
+                <div className="flex-grow border-t border-gray-300"></div>
+                <div className="flex-shrink-0 px-6">
+                  <span className="text-lg font-bold text-black bg-background px-4">Or</span>
+                </div>
+                <div className="flex-grow border-t border-gray-300"></div>
+              </div>
+              
+              {/* Shirt Shop button */}
+              <div className="text-center">
+                <Button 
+                  variant="default"
+                  size="lg"
+                  onClick={() => {
+                    const productsSection = document.getElementById('shirt-shop');
+                    if (productsSection) {
+                      productsSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 hover:from-purple-700 hover:via-blue-700 hover:to-indigo-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 gap-3"
+                >
+                  <Shirt className="h-6 w-6" />
+                  Browse Our Shirt Shop
+                  <Sparkles className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
