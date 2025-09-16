@@ -54,6 +54,110 @@ app.use('/api/stripe', stripePaymentLimiter, stripeRoutes);
 // Admin configuration routes
 app.use('/api/admin', generalLimiter, adminConfigRoutes);
 
+// Design generation endpoint for admin (must be before any /api/printify routes)
+app.post('/api/generate-designs', generalLimiter, async (req, res) => {
+  try {
+    const { prompt, imageSource = 'pollinations', count = 3, shape = 'square', aspectRatio = '1:1' } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    console.log('🎨 Generating designs for admin:', { 
+      prompt: prompt.substring(0, 50), 
+      imageSource, 
+      count, 
+      shape, 
+      aspectRatio 
+    });
+
+    // Convert aspect ratio to dimensions
+    let width = 512;
+    let height = 512;
+    
+    switch (aspectRatio) {
+      case '16:9':
+        width = 512;
+        height = 288;
+        break;
+      case '9:16':
+        width = 288;
+        height = 512;
+        break;
+      case '4:3':
+        width = 512;
+        height = 384;
+        break;
+      case '1:1':
+      default:
+        width = 512;
+        height = 512;
+        break;
+    }
+
+    // Add shape context to the prompt
+    let enhancedPrompt = prompt;
+    if (shape !== 'square') {
+      const shapeDescriptions = {
+        'circle': 'in a circular composition, round framing',
+        'triangle': 'in a triangular composition, geometric triangle framing',
+        'oval': 'in an oval composition, oval framing',
+        'rectangle': 'in a rectangular composition, landscape framing',
+        'diamond': 'in a diamond composition, diamond-shaped framing',
+        'hexagon': 'in a hexagonal composition, hexagon framing'
+      };
+      
+      enhancedPrompt = `${prompt}, ${shapeDescriptions[shape] || ''}`;
+    }
+
+    const designs = [];
+    
+    if (imageSource === 'pollinations') {
+      // Generate designs using Pollinations.ai with shape and aspect ratio
+      for (let i = 0; i < count; i++) {
+        const seedValue = Math.floor(Math.random() * 1000000);
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=${width}&height=${height}&seed=${seedValue}&enhance=true&nologo=true`;
+        designs.push(pollinationsUrl);
+        
+        // Add small delay to avoid overwhelming the API
+        if (i < count - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+    } else if (imageSource === 'stock') {
+      // For stock images, we'd need to implement a stock image search
+      // For now, return placeholder with correct dimensions
+      for (let i = 0; i < count; i++) {
+        designs.push(`https://via.placeholder.com/${width}x${height}.png?text=Stock+Design+${i + 1}+${shape}`);
+      }
+    } else {
+      // Hugging Face would require implementation
+      for (let i = 0; i < count; i++) {
+        designs.push(`https://via.placeholder.com/${width}x${height}.png?text=HF+Design+${i + 1}+${shape}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      designs,
+      prompt: enhancedPrompt,
+      originalPrompt: prompt,
+      shape,
+      aspectRatio,
+      imageSource,
+      count: designs.length,
+      dimensions: { width, height }
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating designs:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate designs',
+      details: error.message 
+    });
+  }
+});
+
 // Printify catalog search routes
 app.use('/api/catalog', generalLimiter, printifyCatalogRoutes);
 console.log('✅ Catalog search available at /api/catalog');

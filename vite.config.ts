@@ -51,6 +51,11 @@ export default defineConfig(({ mode }) => {
           target: 'http://localhost:3001',
           changeOrigin: true
         },
+        // Proxy design generation API calls
+        '/api/generate-designs': {
+          target: 'http://localhost:3001',
+          changeOrigin: true
+        },
         // Proxy Stripe API calls
         '/api/stripe': {
           target: 'http://localhost:3001',

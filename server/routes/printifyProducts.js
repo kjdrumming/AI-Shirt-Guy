@@ -8,10 +8,17 @@ const DynamicProductService = require('../services/dynamicProductService');
 const router = express.Router();
 const dynamicProductService = new DynamicProductService();
 
-// Create cache instance (cache products for 5 minutes)
+// Create cache instance (cache products for 10 minutes, rate limit cache for 1 minute)
 const cache = new NodeCache({
-  stdTTL: 300, // 5 minutes
+  stdTTL: 600, // 10 minutes for products
   checkperiod: 60,
+  useClones: false
+});
+
+// Rate limiting cache - tracks when last API calls were made
+const rateLimitCache = new NodeCache({
+  stdTTL: 60, // 1 minute
+  checkperiod: 10,
   useClones: false
 });
 
@@ -231,20 +238,67 @@ router.get('/all-products', async (req, res) => {
   try {
     const shopId = 24294177; // AI-Shirt-Guy shop ID
     const apiToken = process.env.PRINTIFY_API_TOKEN;
+    const forceRefresh = req.query.refresh === 'true'; // Allow cache busting
     
     if (!apiToken) {
       return res.status(500).json({ error: 'Printify API token not configured' });
     }
 
-    // Check cache first
+    // Check cache first (unless force refresh is requested)
     const cacheKey = `all-products-${shopId}`;
-    const cachedProducts = cache.get(cacheKey);
-    if (cachedProducts) {
-      console.log(`💾 Cache HIT for all products (shop: ${shopId})`);
-      return res.json(cachedProducts);
+    const rateLimitKey = `rate-limit-all-products-${shopId}`;
+    
+    if (!forceRefresh) {
+      const cachedProducts = cache.get(cacheKey);
+      if (cachedProducts) {
+        console.log(`💾 Cache HIT for all products (shop: ${shopId})`);
+        return res.json(cachedProducts);
+      }
+    } else {
+      // Check if we're being rate limited (prevent rapid refreshes)
+      const lastApiCall = rateLimitCache.get(rateLimitKey);
+      console.log(`🔍 Checking rate limit - Last API call: ${lastApiCall ? new Date(lastApiCall).toISOString() : 'none'}`);
+      
+      if (lastApiCall) {
+        const timeSinceLastCall = Date.now() - lastApiCall;
+        const minInterval = 30000; // 30 seconds minimum between API calls
+        
+        console.log(`⏱️ Time since last call: ${timeSinceLastCall}ms, minimum interval: ${minInterval}ms`);
+        
+        if (timeSinceLastCall < minInterval) {
+          const waitTime = Math.ceil((minInterval - timeSinceLastCall) / 1000);
+          console.log(`⏳ RATE LIMITING TRIGGERED: Must wait ${waitTime} more seconds`);
+          
+          // Return cached data if available, even if refresh was requested
+          const cachedProducts = cache.get(cacheKey);
+          if (cachedProducts) {
+            console.log(`💾 Returning cached data with rate limit message`);
+            return res.status(200).json({
+              ...cachedProducts,
+              message: `Data refreshed recently. Next refresh available in ${waitTime} seconds.`,
+              rateLimited: true
+            });
+          }
+          
+          console.log(`❌ No cached data available, returning 429`);
+          return res.status(429).json({ 
+            error: `Please wait ${waitTime} seconds before refreshing again.`,
+            retryAfter: waitTime,
+            rateLimited: true
+          });
+        }
+      }
+      
+      console.log(`🗑️ Force refresh requested, clearing cache for all products (shop: ${shopId})`);
+      cache.del(cacheKey);
     }
 
     console.log(`🛍️ Fetching all products from AI-Shirt-Guy shop ${shopId} for admin selection...`);
+    
+    // Record this API call for rate limiting
+    const apiCallTime = Date.now();
+    rateLimitCache.set(rateLimitKey, apiCallTime);
+    console.log(`📝 Recording API call at: ${new Date(apiCallTime).toISOString()}`);
     
     // Fetch products with limit of 50 (API max)
     const response = await fetch(`https://api.printify.com/v1/shops/${shopId}/products.json?limit=50`, {
@@ -631,6 +685,113 @@ router.post('/create-custom-order', async (req, res) => {
     console.error('❌ Error creating custom product and order:', error);
     res.status(500).json({ 
       error: 'Failed to create custom product and order',
+      details: error.message 
+    });
+  }
+});
+
+/**
+ * Create a product for admin testing (no order)
+ */
+router.post('/create-admin-product', async (req, res) => {
+  try {
+    const { designUrl, shirtTemplate, prompt, blueprintId, printProviderId, price, variantId } = req.body;
+    
+    // Validate required fields
+    if (!designUrl || !shirtTemplate || !blueprintId || !printProviderId) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: designUrl, shirtTemplate, blueprintId, printProviderId' 
+      });
+    }
+
+    console.log('🎨 Creating admin test product:', {
+      shirtTemplate,
+      blueprintId,
+      printProviderId,
+      variantId,
+      prompt: prompt?.substring(0, 50) + '...'
+    });
+
+    // Create product using the dynamic service
+    const result = await dynamicProductService.createAdminProduct({
+      designUrl,
+      shirtTemplate,
+      prompt,
+      blueprintId,
+      printProviderId,
+      price: price || 2499,
+      variantId
+    });
+
+    res.json({
+      success: true,
+      product: result.product,
+      message: 'Admin test product created successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating admin product:', error);
+    res.status(500).json({ 
+      error: 'Failed to create admin product',
+      details: error.message 
+    });
+  }
+});
+
+/**
+ * Delete a product (admin only)
+ */
+router.delete('/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const apiToken = process.env.PRINTIFY_API_TOKEN;
+    
+    if (!apiToken) {
+      return res.status(500).json({ error: 'Printify API token not configured' });
+    }
+
+    if (!productId) {
+      return res.status(400).json({ error: 'Product ID is required' });
+    }
+
+    console.log('🗑️ Deleting product:', productId);
+
+    // Use the same shop ID as other endpoints
+    const shopId = 24294177; // AI-Shirt-Guy shop ID
+
+    // Delete the product
+    const deleteResponse = await fetch(`https://api.printify.com/v1/shops/${shopId}/products/${productId}.json`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${apiToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!deleteResponse.ok) {
+      const errorData = await deleteResponse.json().catch(() => ({}));
+      throw new Error(`Failed to delete product: ${deleteResponse.status} ${deleteResponse.statusText} - ${errorData.error || ''}`);
+    }
+
+    console.log('✅ Product deleted successfully:', productId);
+    
+    // Clear cache to ensure fresh data on next request
+    const allProductsCacheKey = `all-products-${shopId}`;
+    const featuredProductsCacheKey = `featured-products-${shopId}`;
+    cache.del(allProductsCacheKey);
+    cache.del(featuredProductsCacheKey);
+    console.log('🗑️ Cache cleared after product deletion');
+    
+    res.json({
+      success: true,
+      message: 'Product deleted successfully',
+      productId
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting product:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete product',
       details: error.message 
     });
   }

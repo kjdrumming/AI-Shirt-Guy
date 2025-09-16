@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Heart, ShoppingCart, AlertCircle, Download, X } from "lucide-react";
 import { ShirtMockup } from "@/components/ShirtMockup";
 import { getShapeStyles, type ImageShape, type AspectRatio } from "@/lib/utils";
@@ -202,6 +202,10 @@ export function DesignDisplay({ designs, onSelectDesign, selectedDesign, selecte
       {/* AI Image Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-4xl w-full p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Design Preview</DialogTitle>
+            <DialogDescription>Full size preview of the selected design</DialogDescription>
+          </DialogHeader>
           {previewImage && (
             <div className="relative">
               <Button
